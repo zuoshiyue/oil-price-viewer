@@ -12,6 +12,7 @@ import {
   deltaClass,
   isStale,
   hasAdjustmentInRange,
+  nearestByX,
   parseDateOnly,
 } from './logic.js';
 
@@ -47,6 +48,18 @@ test('selectRange: 区间早于全部数据时 startIdx 为 0', () => {
   const { startIdx, endIdx } = selectRange(DATES, 'week', new Date('2020-01-01T00:00:00Z'));
   assert.equal(startIdx, 0);
   assert.equal(endIdx, DATES.length - 1);
+});
+
+test('selectRange: 图表起点包含区间前的那个窗口（阶梯线的起始水平段）', () => {
+  const { startIdx, rangeStartIdx } = selectRange(DATES, 'week', NOW);
+  assert.equal(rangeStartIdx, 3, '区间内第一个窗口是 11-20');
+  assert.equal(startIdx, 2, '图表从区间前一个窗口（11-13）起画');
+});
+
+test('selectRange: 区间内没有窗口时 rangeStartIdx 指向末尾之后', () => {
+  const { rangeStartIdx, startIdx } = selectRange(DATES, 'week', new Date('2026-12-10T12:00:00+08:00'));
+  assert.equal(rangeStartIdx, DATES.length);
+  assert.equal(startIdx, DATES.length - 1, '仍保留最后一个窗口作为当前价锚点');
 });
 
 test('sliceSeries 截取区间内的序列并保持对齐', () => {
@@ -164,4 +177,15 @@ test('hasAdjustmentInRange 区间内全是平价时为假', () => {
 
 test('hasAdjustmentInRange 忽略空值相邻比较', () => {
   assert.equal(hasAdjustmentInRange(DATES, [8.61, null, null, 8.61], 0, 3), false);
+});
+
+test('nearestByX 返回距离最近的数据点', () => {
+  const items = [{ x: 10, value: 8.61 }, { x: 50, value: 8.89 }, { x: 90, value: 8.37 }];
+  assert.equal(nearestByX(items, 12).value, 8.61);
+  assert.equal(nearestByX(items, 60).value, 8.89);
+  assert.equal(nearestByX(items, 1000).value, 8.37);
+});
+
+test('nearestByX 空数组返回 null', () => {
+  assert.equal(nearestByX([], 10), null);
 });

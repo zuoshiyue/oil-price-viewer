@@ -274,6 +274,7 @@ fieldset legend {
 
 /* 标号 chips：用原生 checkbox + label，选中态只改颜色不改变布局 */
 .chip {
+  position: relative;
   display: inline-flex;
   align-items: center;
   min-block-size: 44px;
@@ -318,9 +319,12 @@ fieldset legend {
   position: absolute;
   clip-path: inset(50%);
   margin: 0;
+  /* 绝对定位的 legend 会盖在第一个选项上，必须禁止它接收点击 */
+  pointer-events: none;
 }
 
 .segmented__item {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -423,7 +427,8 @@ fieldset legend {
 .price__meta {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  flex-wrap: wrap;
+  gap: 0.2rem 0.4rem;
   font-size: 0.8rem;
   color: var(--fg-muted);
   font-variant-numeric: tabular-nums;
@@ -432,6 +437,7 @@ fieldset legend {
 .delta {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .delta--up {
@@ -484,6 +490,37 @@ fieldset legend {
   position: relative;
 }
 
+.chart-cursor {
+  position: absolute;
+  inset-block: 0;
+  inline-size: 1px;
+  background: var(--fg-muted);
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.chart-tooltip {
+  position: absolute;
+  inset-block-start: 8px;
+  inset-inline-end: 0;
+  max-inline-size: 70%;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--fg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.chart-tooltip[hidden],
+.chart-cursor[hidden] {
+  display: none;
+}
+
 #chart {
   display: block;
   inline-size: 100%;
@@ -497,17 +534,15 @@ fieldset legend {
   }
 }
 
+/* 图表下方的说明条：空态或"本区间无调价"等提示，不遮挡图表 */
 .chart-empty {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  margin: 0;
-  padding: 1rem;
+  margin-block-start: 0.6rem;
+  padding: 0.55rem 0.75rem;
   text-align: center;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
   color: var(--fg-muted);
-  background: color-mix(in oklab, var(--surface) 82%, transparent);
+  background: var(--surface-2);
+  border: 1px dashed var(--border);
   border-radius: var(--radius-sm);
 }
 

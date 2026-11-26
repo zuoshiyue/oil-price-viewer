@@ -17,20 +17,23 @@ export function parseDateOnly(value) {
   return new Date(`${value}T00:00:00+08:00`);
 }
 
-/** 取区间内的下标范围。 */
+/**
+ * 取区间的下标范围。
+ * - rangeStartIdx：区间内第一个窗口的下标（区间内没有窗口时为 dates.length）
+ * - startIdx：图表起点，比 rangeStartIdx 早一个窗口 —— 阶梯线需要区间前的那个点作为起始水平段
+ */
 export function selectRange(dates, rangeKey, now) {
   const days = RANGES[rangeKey] ?? RANGES.month;
   const cutoff = now.getTime() - days * 86400000;
-  let startIdx = 0;
+  let rangeStartIdx = dates.length;
   for (let i = 0; i < dates.length; i += 1) {
     if (parseDateOnly(dates[i]).getTime() >= cutoff) {
-      startIdx = i;
+      rangeStartIdx = i;
       break;
     }
-    startIdx = i + 1;
   }
-  if (startIdx >= dates.length) startIdx = Math.max(0, dates.length - 1);
-  return { startIdx, endIdx: dates.length - 1 };
+  const startIdx = rangeStartIdx === 0 ? 0 : Math.max(0, rangeStartIdx - 1);
+  return { startIdx, endIdx: dates.length - 1, rangeStartIdx };
 }
 
 /** 截取区间内的价格序列，保持与日期对齐。 */
@@ -128,4 +131,20 @@ export function hasAdjustmentInRange(dates, prices, startIdx, endIdx) {
     if (cur !== prev) return true;
   }
   return false;
+}
+
+/** 图表十字线用：找横坐标离 x 最近的数据点。 */
+export function nearestByX(items, x) {
+  if (!Array.isArray(items) || items.length === 0) return null;
+  let best = null;
+  let bestDistance = Infinity;
+  for (const item of items) {
+    if (item === null || item === undefined || !Number.isFinite(item.x)) continue;
+    const distance = Math.abs(item.x - x);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = item;
+    }
+  }
+  return best;
 }

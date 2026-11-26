@@ -24,7 +24,7 @@ const GRADE_LABELS = {
   p89: '89# 汽油',
 };
 
-const DEFAULT_PAD = { top: 16, right: 54, bottom: 26, left: 46 };
+const DEFAULT_PAD = { top: 30, right: 54, bottom: 26, left: 46 };
 
 function roundTo(value, decimals) {
   const factor = 10 ** decimals;
@@ -58,7 +58,7 @@ export function niceTicks(min, max, count = 4) {
 function collectValues(series) {
   const values = [];
   for (const entry of series) {
-    for (const [, value] of entry.points) {
+    for (const [, value] of entry.values ?? []) {
       if (value === null || value === undefined || !Number.isFinite(value)) continue;
       values.push(value);
     }
@@ -69,13 +69,14 @@ function collectValues(series) {
 /**
  * 计算坐标映射。
  * 输入：{ series | points, overlay, width, height, pad }
+ * series 每项：{ grade, values: [[date, value|null], ...] }
  * 输出：{ x, y, x2, y2, ticks, ticks2, width, height, plot }
  */
 export function buildScales({ series = [], points = null, overlay = null, width, height, pad } = {}) {
   const normalizedSeries = series.length
     ? series
     : points
-      ? [{ grade: 'p92', points }]
+      ? [{ grade: 'p92', values: points }]
       : [];
 
   const p = { ...DEFAULT_PAD, ...(pad ?? {}) };
@@ -88,7 +89,7 @@ export function buildScales({ series = [], points = null, overlay = null, width,
   plot.width = Math.max(1, plot.right - plot.left);
   plot.height = Math.max(1, plot.bottom - plot.top);
 
-  const allPoints = normalizedSeries.flatMap((entry) => entry.points);
+  const allPoints = normalizedSeries.flatMap((entry) => entry.values ?? []);
   const times = allPoints.map(([date]) => parseDateOnly(date).getTime());
   const tMin = times.length ? Math.min(...times) : 0;
   const tMax = times.length ? Math.max(...times) : 1;
@@ -156,56 +157,87 @@ function pickLabelIndices(count, maxLabels) {
 }
 
 /**
- * 渲染图表。
- * series: [{ grade, points }]，points: [[date, value|null], ...]
- * overlay: [[date, value], ...]（右轴）
+ * 生成图表绘制模型（纯函数，不碰 DOM，可在 node 里测）。
+ * renderChart 只是把这份模型画到 SVG 上。
  */
-export function renderChart(svg, { series = [], points = null, overlay = null, width = 320, height = 260 } = {}) {
-  if (typeof document === 'undefined' || !svg || typeof svg.replaceChildren !== 'function') return;
-
+export function buildChartModel({ series = [], points = null, overlay = null, width = 320, height = 260 } = {}) {
   const normalizedSeries = series.length
     ? series
     : points
-      ? [{ grade: 'p92', points }]
+      ? [{ grade: 'p92', values: points }]
       : [];
+
+  const scales = buildScales({ series: normalizedSeries, overlay, width, height });
+  const { plot, ticks, ticks2 } = scales;
+
+  const paths = normalizedSeries.map((entry) => ({
+    grade: entry.grade,
+    d: buildStepPath(entry.values ?? [], scales.x, scales.y),
+    markers: (entry.values ?? [])
+      .filter(([, value]) => value !== null && value !== undefined && Number.isFinite(value))
+      .map(([date, value]) => ({ date, value, x: scales.x(date), y: scales.y(value) })),
+  }));
+
+  const allPoints = normalizedSeries[0]?.values ?? [];
+  const xLabels = pickLabelIndices(allPoints.length, 6).map((index) => {
+    const [date] = allPoints[index];
+    return { x: scales.x(date), text: date.slice(2).replace(/-/g, '/') };
+  });
+
+  const yLabels = ticks.map((tick) => ({ y: scales.y(tick), text: tick.toFixed(2) }));
+  const rightLabels = ticks2 ? ticks2.map((tick) => ({ y: scales.y2(tick), text: tick.toFixed(1) })) : [];
+
+  let overlayPath = null;
+  if (overlay && overlay.length && scales.y2) {
+    overlayPath = buildStepPath(overlay, scales.x, scales.y2);
+  }
+
+  return { scales, plot, paths, xLabels, yLabels, rightLabels, overlayPath };
+}
+
+/**
+ * 渲染图表。
+ * series: [{ grade, values }]，values: [[date, value|null], ...]
+ * overlay: [[date, value], ...]（右轴）
+ */
+export function renderChart(svg, options = {}) {
+  if (typeof document === 'undefined' || !svg || typeof svg.replaceChildren !== 'function') return;
+
+  const { width = 320, height = 260 } = options;
+  const model = buildChartModel(options);
+  const { plot, scales } = model;
 
   svg.replaceChildren();
   svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
   svg.setAttribute('width', String(width));
   svg.setAttribute('height', String(height));
 
-  const scales = buildScales({ series: normalizedSeries, overlay, width, height });
-  const { plot, ticks, ticks2 } = scales;
-
   const fgMuted = cssVar('--fg-muted', '#5b636c');
   const border = cssVar('--border', '#e2e5ea');
-  const axisText = cssVar('--fg', '#1c2024');
 
   // 网格线与左轴刻度
-  for (const tick of ticks) {
-    const y = scales.y(tick);
+  for (const label of model.yLabels) {
     svg.append(el('line', {
-      x1: plot.left, y1: y, x2: plot.right, y2: y, stroke: border, 'stroke-width': 1,
+      x1: plot.left, y1: label.y, x2: plot.right, y2: label.y, stroke: border, 'stroke-width': 1,
     }));
-    const label = el('text', {
-      x: plot.left - 8, y: y + 4, 'text-anchor': 'end', fill: fgMuted, 'font-size': 11,
+    const text = el('text', {
+      x: plot.left - 8, y: label.y + 4, 'text-anchor': 'end', fill: fgMuted, 'font-size': 11,
     });
-    label.textContent = tick.toFixed(2);
-    svg.append(label);
+    text.textContent = label.text;
+    svg.append(text);
   }
 
   // 右轴刻度（叠加国际原油时）
-  if (ticks2) {
-    for (const tick of ticks2) {
-      const y = scales.y2(tick);
-      const label = el('text', {
-        x: plot.right + 8, y: y + 4, 'text-anchor': 'start', fill: fgMuted, 'font-size': 11,
+  if (model.rightLabels.length) {
+    for (const label of model.rightLabels) {
+      const text = el('text', {
+        x: plot.right + 8, y: label.y + 4, 'text-anchor': 'start', fill: fgMuted, 'font-size': 11,
       });
-      label.textContent = tick.toFixed(1);
-      svg.append(label);
+      text.textContent = label.text;
+      svg.append(text);
     }
     const unit = el('text', {
-      x: plot.right + 8, y: plot.top - 4, 'text-anchor': 'start', fill: fgMuted, 'font-size': 10,
+      x: plot.right + 8, y: 12, 'text-anchor': 'start', fill: fgMuted, 'font-size': 10,
     });
     unit.textContent = '美元/桶';
     svg.append(unit);
@@ -213,56 +245,49 @@ export function renderChart(svg, { series = [], points = null, overlay = null, w
 
   // 左轴单位
   const unitLeft = el('text', {
-    x: plot.left - 8, y: plot.top - 4, 'text-anchor': 'end', fill: fgMuted, 'font-size': 10,
+    x: plot.left - 8, y: 12, 'text-anchor': 'end', fill: fgMuted, 'font-size': 10,
   });
   unitLeft.textContent = '元/升';
   svg.append(unitLeft);
 
   // x 轴刻度
-  const allPoints = normalizedSeries[0]?.points ?? [];
-  const labelIndices = pickLabelIndices(allPoints.length, 6);
-  for (const index of labelIndices) {
-    const [date] = allPoints[index];
-    const x = scales.x(date);
-    const label = el('text', {
-      x, y: plot.bottom + 16, 'text-anchor': 'middle', fill: fgMuted, 'font-size': 11,
+  for (const label of model.xLabels) {
+    const text = el('text', {
+      x: label.x, y: plot.bottom + 16, 'text-anchor': 'middle', fill: fgMuted, 'font-size': 11,
     });
-    label.textContent = date.slice(2).replace(/-/g, '/');
-    svg.append(label);
+    text.textContent = label.text;
+    svg.append(text);
   }
 
   // 阶梯线 + 调价点
-  for (const entry of normalizedSeries) {
-    const color = GRADE_COLORS[entry.grade] ?? cssVar('--accent', '#2563eb');
-    const pathData = buildStepPath(entry.points, scales.x, scales.y);
-    if (pathData) {
+  for (const path of model.paths) {
+    const color = GRADE_COLORS[path.grade] ?? cssVar('--accent', '#2563eb');
+    if (path.d) {
       svg.append(el('path', {
-        d: pathData, fill: 'none', stroke: color, 'stroke-width': 2,
+        d: path.d, fill: 'none', stroke: color, 'stroke-width': 2,
         'stroke-linejoin': 'round', 'stroke-linecap': 'round',
       }));
     }
-    for (const [date, value] of entry.points) {
-      if (value === null || value === undefined || !Number.isFinite(value)) continue;
+    for (const marker of path.markers) {
       svg.append(el('circle', {
-        cx: scales.x(date), cy: scales.y(value), r: 3, fill: color,
+        cx: marker.x, cy: marker.y, r: 3, fill: color,
         stroke: cssVar('--surface', '#ffffff'), 'stroke-width': 1,
       }));
     }
   }
 
   // 叠加的国际原油（右轴，低饱和）
-  if (overlay && overlay.length && scales.y2) {
-    const pathData = buildStepPath(overlay, scales.x, scales.y2);
-    if (pathData) {
-      svg.append(el('path', {
-        d: pathData, fill: 'none', stroke: fgMuted, 'stroke-width': 1.5, 'stroke-opacity': 0.55,
-      }));
-    }
+  if (model.overlayPath) {
+    svg.append(el('path', {
+      d: model.overlayPath, fill: 'none', stroke: fgMuted, 'stroke-width': 1.5, 'stroke-opacity': 0.55,
+    }));
   }
 
   // 供读屏与 tooltip 使用的元信息
-  svg.dataset.pointCount = String(allPoints.length);
-  svg.dataset.seriesCount = String(normalizedSeries.length);
+  svg.dataset.pointCount = String(model.paths[0]?.markers.length ?? 0);
+  svg.dataset.seriesCount = String(model.paths.length);
+  svg.__chartModel = model;
+  return model;
 }
 
 export { GRADE_LABELS };

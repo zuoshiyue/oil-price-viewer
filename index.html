@@ -58,40 +58,40 @@
 
           <fieldset class="chips" id="grade-chips">
             <legend class="field__label">标号（可多选）</legend>
-            <label class="chip">
-              <input type="checkbox" name="grade" value="p92" data-grade="p92" checked />
+            <label class="chip" for="grade-p92">
+              <input type="checkbox" id="grade-p92" name="grade" value="p92" data-grade="p92" checked />
               <span>92# 汽油</span>
             </label>
-            <label class="chip">
-              <input type="checkbox" name="grade" value="p95" data-grade="p95" />
+            <label class="chip" for="grade-p95">
+              <input type="checkbox" id="grade-p95" name="grade" value="p95" data-grade="p95" />
               <span>95# 汽油</span>
             </label>
-            <label class="chip">
-              <input type="checkbox" name="grade" value="p98" data-grade="p98" />
+            <label class="chip" for="grade-p98">
+              <input type="checkbox" id="grade-p98" name="grade" value="p98" data-grade="p98" />
               <span>98# 汽油</span>
             </label>
-            <label class="chip">
-              <input type="checkbox" name="grade" value="p0" data-grade="p0" />
+            <label class="chip" for="grade-p0">
+              <input type="checkbox" id="grade-p0" name="grade" value="p0" data-grade="p0" />
               <span>0# 柴油</span>
             </label>
-            <label class="chip">
-              <input type="checkbox" name="grade" value="p89" data-grade="p89" />
+            <label class="chip" for="grade-p89">
+              <input type="checkbox" id="grade-p89" name="grade" value="p89" data-grade="p89" />
               <span>89# 汽油</span>
             </label>
           </fieldset>
 
           <fieldset class="segmented" id="range-tabs">
             <legend class="field__label">时间区间</legend>
-            <label class="segmented__item">
-              <input type="radio" name="range" value="week" data-range="week" />
+            <label class="segmented__item" for="range-week">
+              <input type="radio" id="range-week" name="range" value="week" data-range="week" />
               <span>近一周</span>
             </label>
-            <label class="segmented__item">
-              <input type="radio" name="range" value="month" data-range="month" checked />
+            <label class="segmented__item" for="range-month">
+              <input type="radio" id="range-month" name="range" value="month" data-range="month" checked />
               <span>近一月</span>
             </label>
-            <label class="segmented__item">
-              <input type="radio" name="range" value="year" data-range="year" />
+            <label class="segmented__item" for="range-year">
+              <input type="radio" id="range-year" name="range" value="year" data-range="year" />
               <span>近一年</span>
             </label>
           </fieldset>
@@ -117,6 +117,8 @@
         </figcaption>
         <div class="chart-wrap">
           <svg id="chart" role="img" aria-label="油价走势图" preserveAspectRatio="xMidYMid meet"></svg>
+          <div id="chart-cursor" class="chart-cursor" aria-hidden="true" hidden></div>
+          <div id="chart-tooltip" class="chart-tooltip" hidden></div>
           <p id="chart-empty" class="chart-empty" hidden></p>
         </div>
         <div class="legend" id="chart-legend"></div>

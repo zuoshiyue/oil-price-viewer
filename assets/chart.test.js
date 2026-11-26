@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { niceTicks, buildScales, renderChart } from './chart.js';
+import { niceTicks, buildScales, buildChartModel, renderChart } from './chart.js';
 
 const POINTS = [
   ['2026-01-05', 8.2],
@@ -74,13 +74,17 @@ test('buildScales 有叠加序列时提供右轴刻度', () => {
 test('buildScales 多条序列时 y 值域覆盖所有序列', () => {
   const scales = buildScales({
     series: [
-      { grade: 'p92', points: POINTS },
-      { grade: 'p95', points: [['2026-01-05', 9.1], ['2026-01-25', 9.3]] },
+      { grade: 'p92', values: POINTS },
+      { grade: 'p95', values: [['2026-01-05', 9.1], ['2026-01-25', 9.3]] },
     ],
     width: 400,
     height: 240,
   });
   assert.ok(scales.ticks[scales.ticks.length - 1] >= 9.3, '右边界应覆盖 95 号最高价');
+});
+
+test('buildScales 序列缺 values 时不抛错（防止形状不一致时整页崩掉）', () => {
+  assert.doesNotThrow(() => buildScales({ series: [{ grade: 'p92' }], width: 400, height: 240 }));
 });
 
 test('buildScales 只有一个数据点时不除零', () => {
@@ -96,4 +100,47 @@ test('renderChart 在没有 DOM 时不抛错', () => {
 
 test('renderChart 空数据时不抛错', () => {
   assert.doesNotThrow(() => renderChart(null, { points: [], width: 400, height: 240 }));
+});
+
+test('buildChartModel 为每条序列产出路径与调价点', () => {
+  const model = buildChartModel({
+    series: [{ grade: 'p92', values: POINTS }],
+    width: 400,
+    height: 240,
+  });
+  assert.equal(model.paths.length, 1);
+  assert.ok(model.paths[0].d.startsWith('M'));
+  assert.equal(model.paths[0].markers.length, 3);
+  assert.ok(model.paths[0].markers.every((marker) => Number.isFinite(marker.x) && Number.isFinite(marker.y)));
+});
+
+test('buildChartModel 空值点不进 markers', () => {
+  const model = buildChartModel({
+    series: [{ grade: 'p92', values: [['2026-01-05', 8.2], ['2026-01-15', null]] }],
+    width: 400,
+    height: 240,
+  });
+  assert.equal(model.paths[0].markers.length, 1);
+});
+
+test('buildChartModel 产出 x 轴标签且数量克制', () => {
+  const many = Array.from({ length: 40 }, (_, i) => [`2026-${String((i % 12) + 1).padStart(2, '0')}-01`, 8 + i * 0.01]);
+  const model = buildChartModel({ series: [{ grade: 'p92', values: many }], width: 400, height: 240 });
+  assert.ok(model.xLabels.length <= 7, `x 标签过多：${model.xLabels.length}`);
+  assert.ok(model.xLabels.every((label) => typeof label.text === 'string'));
+});
+
+test('buildChartModel 有叠加序列时产出右轴标签与叠加路径', () => {
+  const model = buildChartModel({
+    series: [{ grade: 'p92', values: POINTS }],
+    overlay: [['2026-01-05', 90.1], ['2026-01-25', 89.5]],
+    width: 400,
+    height: 240,
+  });
+  assert.ok(model.rightLabels.length >= 2);
+  assert.ok(model.overlayPath.startsWith('M'));
+});
+
+test('buildChartModel 序列缺 values 时不抛错（形状不一致时不能整页崩掉）', () => {
+  assert.doesNotThrow(() => buildChartModel({ series: [{ grade: 'p92' }], width: 400, height: 240 }));
 });
