@@ -1,9 +1,10 @@
 /* ============================================================
-   油价看板 · Material 3 风格设计系统
-   - tonal surface 层级（背景 < 卡片 < 内嵌填充），无纯白页面底色
-   - 涨红跌绿走 container 色对（对比度经 tools/check-contrast.mjs 校验）
-   - 交互用 state layer（背景色过渡），不做位移抖动
-   - emphasized 缓动 cubic-bezier(0.2,0,0,1)，尊重 prefers-reduced-motion
+   油价看板 · Aurora Glass 设计系统
+   - 极光渐变背景 + 玻璃拟态卡片（backdrop-blur + 半透明描边）
+   - 价格大字渐变着色（两端色均通过大文本 3:1 校验）
+   - 图表曲线发光（CSS drop-shadow + currentColor）
+   - 涨红跌绿 pill 徽标带柔光；动效遵守 prefers-reduced-motion
+   - 对比度校验：tools/check-contrast.mjs（并入 npm test）
    ============================================================ */
 
 :root {
@@ -17,52 +18,61 @@
     color-scheme: light;
   }
 
-  /* --- tonal surfaces --- */
-  --bg: light-dark(#f3f5f9, #111318);
-  --surface: light-dark(#ffffff, #1a1c21);
-  --surface-2: light-dark(#e9eef6, #23262c);
-  --surface-3: light-dark(#dce4ef, #2c3038);
+  /* --- 表面 --- */
+  --bg: light-dark(#eef3fb, #0a0e1a);
+  --fg: light-dark(#17203a, #e6eaf2);
+  --fg-muted: light-dark(#46516b, #a8b0c0);
 
-  /* --- 文本 --- */
-  --fg: light-dark(#1a1c1e, #e3e2e6);
-  --fg-muted: light-dark(#43474e, #c4c6cc);
+  /* 玻璃卡：半透明 + 模糊（亮色模式退化为实底白 + 轻模糊） */
+  --glass: light-dark(rgb(255 255 255 / 82%), rgb(255 255 255 / 7%));
+  --glass-strong: light-dark(rgb(255 255 255 / 92%), rgb(255 255 255 / 11%));
+  --glass-border: light-dark(rgb(23 32 58 / 10%), rgb(255 255 255 / 14%));
+  --glass-highlight: light-dark(rgb(255 255 255 / 65%), rgb(255 255 255 / 10%));
+  /* 注意：light-dark() 只支持颜色，模糊半径用统一值 */
+  --blur: 14px;
 
-  /* --- 形状与描边 --- */
-  --outline: light-dark(#74777f, #8e9099);
-  --outline-soft: light-dark(#c4c7ce, #3c4048);
+  /* --- 描边 --- */
+  --outline: light-dark(#7a86a2, #8b93a8);
+  --outline-soft: light-dark(#c9d2e4, #2a3346);
 
-  /* --- 主色（M3 blue tonal） --- */
-  --primary: light-dark(#1f5aa8, #a8c7f0);
-  --on-primary: light-dark(#ffffff, #0a2f66);
-  --primary-container: light-dark(#d6e3ff, #274a78);
-  --on-primary-container: light-dark(#0a2f66, #d6e3ff);
+  /* --- 主色 --- */
+  --primary: light-dark(#1e63c4, #6cb2ff);
+  --on-primary: light-dark(#ffffff, #062347);
+  --primary-container: light-dark(#d9e8ff, #1e3a5f);
+  --on-primary-container: light-dark(#0a2f66, #cfe4ff);
+  --primary-glow: light-dark(rgb(30 99 196 / 35%), rgb(108 178 255 / 40%));
 
-  /* --- 涨红 / 跌绿（container 色对 + 线条色） --- */
-  --up: light-dark(#b3231d, #ffb4ab);
-  --up-container: light-dark(#fbeae9, #5c1f1b);
+  /* --- 涨红 / 跌绿（container 色对 + 柔光） --- */
+  --up: light-dark(#b3231d, #ff8a80);
+  --up-container: light-dark(#fbeae9, #4a1d1a);
   --on-up-container: light-dark(#8c1d18, #ffd9d5);
+  --up-glow: light-dark(rgb(179 35 29 / 22%), rgb(255 138 128 / 30%));
   --down: light-dark(#0e6e44, #74dcae);
-  --down-container: light-dark(#e2f4ea, #14452f);
-  --on-down-container: light-dark(#0b5636, #c4f1dd);
-  --flat: light-dark(#43474e, #c4c6cc);
-  --flat-container: light-dark(#e9eef6, #2c3038);
-  --on-flat-container: light-dark(#43474e, #c4c6cc);
+  --down-container: light-dark(#e2f4ea, #0e3d28);
+  --on-down-container: light-dark(#0b5636, #a9ebcb);
+  --down-glow: light-dark(rgb(14 110 68 / 20%), rgb(116 220 174 / 28%));
+  --flat-container: light-dark(#e9eef6, #242e40);
+  --on-flat-container: light-dark(#46516b, #a8b0c0);
 
-  /* --- 图表序列色（与图例/卡片标题同源） --- */
-  --grade-p92: light-dark(#1f5aa8, #a8c7f0);
-  --grade-p95: light-dark(#8c4a00, #e5b678);
-  --grade-p98: light-dark(#6e56cf, #c4b5f0);
-  --grade-p0: light-dark(#00696e, #7bd4d9);
-  --grade-p89: light-dark(#a03b5e, #e8a2be);
+  /* --- 图表序列色（深端 + 渐变浅端，两端均过对比度校验） --- */
+  --grade-p92: light-dark(#1e63c4, #5ea0f5);
+  --grade-p92-lite: light-dark(#2f86dc, #8cc2ff);
+  --grade-p95: light-dark(#9a5b00, #e8a65a);
+  --grade-p95-lite: light-dark(#b97a1f, #f5c584);
+  --grade-p98: light-dark(#6a50d8, #a78bfa);
+  --grade-p98-lite: light-dark(#8268e8, #c4afff);
+  --grade-p0: light-dark(#00727a, #4fc3d1);
+  --grade-p0-lite: light-dark(#0a97a0, #82dde6);
+  --grade-p89: light-dark(#a23b6b, #e87fb0);
+  --grade-p89-lite: light-dark(#bf5986, #f2a5c8);
 
   /* --- 形状 / 动效 --- */
-  --radius-lg: 20px;
-  --radius: 16px;
+  --radius-lg: 22px;
+  --radius: 18px;
   --radius-sm: 12px;
   --radius-pill: 999px;
   --ease: cubic-bezier(0.2, 0, 0, 1);
-  --duration: 200ms;
-  --shadow-1: light-dark(0 1px 2px rgb(16 24 40 / 8%), none);
+  --duration: 220ms;
   --gap: 0.75rem;
 }
 
@@ -78,7 +88,7 @@ html {
 
 body {
   margin: 0;
-  padding: 0;
+  min-block-size: 100dvb;
   background: var(--bg);
   color: var(--fg);
   font-family:
@@ -91,6 +101,20 @@ body {
   font-size: 16px;
   line-height: 1.5;
   overflow-wrap: anywhere;
+  position: relative;
+}
+
+/* 极光背景：固定层，深浅两套径向渐变 */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(60rem 32rem at 12% -6%, light-dark(rgb(30 99 196 / 16%), rgb(47 134 220 / 26%)), transparent 70%),
+    radial-gradient(48rem 30rem at 105% 8%, light-dark(rgb(0 160 168 / 12%), rgb(35 195 209 / 17%)), transparent 70%),
+    radial-gradient(52rem 34rem at 50% 112%, light-dark(rgb(106 80 216 / 10%), rgb(167 139 250 / 14%)), transparent 72%);
 }
 
 h1,
@@ -133,11 +157,11 @@ a {
   inset-block-start: -3rem;
   z-index: 10;
   padding: 0.5rem 0.9rem;
-  background: var(--surface);
+  background: var(--glass-strong);
+  backdrop-filter: blur(var(--blur));
   color: var(--fg);
-  border: 1px solid var(--outline);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-1);
   transition: inset-block-start var(--duration) var(--ease);
 }
 
@@ -145,7 +169,23 @@ a {
   inset-block-start: 0.5rem;
 }
 
-/* ---------- 顶栏（app bar 风格） ---------- */
+/* ---------- 玻璃表面基类 ---------- */
+
+.glass,
+.panel,
+.chart-figure,
+.card {
+  position: relative;
+  background: var(--glass);
+  backdrop-filter: blur(var(--blur)) saturate(140%);
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(140%);
+  border: 1px solid var(--glass-border);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    0 8px 24px light-dark(rgb(23 32 58 / 6%), rgb(0 0 0 / 35%));
+}
+
+/* ---------- 顶栏 ---------- */
 
 .topbar {
   display: flex;
@@ -155,20 +195,25 @@ a {
   gap: var(--gap);
   max-inline-size: 1120px;
   margin-inline: auto;
-  padding: 1.25rem 1rem 0.75rem;
+  padding: 1.4rem 1rem 0.75rem;
+  animation: rise 480ms var(--ease) both;
 }
 
 .topbar__title h1 {
-  font-size: 1.45rem;
-  font-weight: 700;
+  font-size: 1.5rem;
+  font-weight: 800;
   letter-spacing: 0.01em;
+  background: linear-gradient(120deg, var(--fg) 30%, var(--primary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .topbar__subtitle {
-  margin: 0.2rem 0 0;
+  margin: 0.25rem 0 0;
   font-size: 0.78rem;
   color: var(--fg-muted);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
 }
 
 .topbar__tools {
@@ -184,6 +229,10 @@ a {
   color: var(--fg-muted);
   max-inline-size: 24rem;
   font-variant-numeric: tabular-nums;
+  padding: 0.35rem 0.7rem;
+  border-radius: var(--radius-pill);
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
 }
 
 .meta[data-state='stale'] {
@@ -199,25 +248,33 @@ a {
 .btn {
   min-block-size: 44px;
   min-inline-size: 44px;
-  padding: 0.5rem 1rem;
+  padding: 0.5rem 1.05rem;
   font: inherit;
   font-size: 0.88rem;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--fg);
-  background: var(--surface);
-  border: 1px solid var(--outline);
+  background: var(--glass);
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-pill);
   cursor: pointer;
-  transition: background-color var(--duration) var(--ease), border-color var(--duration) var(--ease);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+  transition:
+    background-color var(--duration) var(--ease),
+    border-color var(--duration) var(--ease),
+    box-shadow var(--duration) var(--ease);
 }
 
 .btn:hover {
-  background: var(--surface-3);
+  background: var(--glass-strong);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    0 0 18px var(--primary-glow);
 }
 
 .btn:active {
-  background: var(--surface-3);
-  border-color: var(--fg-muted);
+  border-color: var(--outline);
 }
 
 .btn--icon {
@@ -234,6 +291,9 @@ a {
 
 .btn--ghost {
   background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
 }
 
 .theme-toggle__light {
@@ -252,7 +312,7 @@ a {
   display: none;
 }
 
-/* ---------- 布局 ---------- */
+/* ---------- 布局与入场动效 ---------- */
 
 main {
   max-inline-size: 1120px;
@@ -263,17 +323,33 @@ main {
 }
 
 .panel {
-  background: var(--surface);
-  border: 1px solid light-dark(rgb(26 28 30 / 8%), rgb(255 255 255 / 8%));
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-1);
   padding: 1.1rem;
+  animation: rise 480ms var(--ease) 60ms both;
+}
+
+.chart-figure {
+  margin: 0;
+  padding: 1.1rem;
+  border-radius: var(--radius-lg);
+  animation: rise 480ms var(--ease) 120ms both;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .panel__title {
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.1em;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
   color: var(--fg-muted);
   margin-block-end: 0.8rem;
 }
@@ -301,7 +377,7 @@ main {
 
 .field__label {
   font-size: 0.75rem;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--fg-muted);
   letter-spacing: 0.03em;
 }
@@ -312,16 +388,17 @@ select {
   font: inherit;
   font-size: 0.95rem;
   color: var(--fg);
-  background: var(--surface-2);
-  border: 1px solid var(--outline-soft);
+  background: var(--glass-strong);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-sm);
   inline-size: 100%;
   cursor: pointer;
-  transition: background-color var(--duration) var(--ease), border-color var(--duration) var(--ease);
+  transition: border-color var(--duration) var(--ease), box-shadow var(--duration) var(--ease);
 }
 
 select:hover {
   border-color: var(--outline);
+  box-shadow: 0 0 14px var(--primary-glow);
 }
 
 fieldset {
@@ -339,7 +416,7 @@ fieldset legend {
   margin-block-end: 0.4rem;
 }
 
-/* 标号 chips：M3 filter chip —— pill + 描边，选中态换容器色（不改布局） */
+/* 标号 chips：玻璃 pill，选中态主色发光 */
 .chip {
   position: relative;
   display: inline-flex;
@@ -347,23 +424,34 @@ fieldset legend {
   min-block-size: 44px;
   padding: 0 1rem;
   font-size: 0.88rem;
-  font-weight: 500;
-  border: 1px solid var(--outline);
+  font-weight: 600;
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-pill);
-  background: var(--surface);
+  background: var(--glass);
+  color: var(--fg);
   cursor: pointer;
   user-select: none;
-  transition: background-color var(--duration) var(--ease), border-color var(--duration) var(--ease);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+  transition:
+    background-color var(--duration) var(--ease),
+    border-color var(--duration) var(--ease),
+    box-shadow var(--duration) var(--ease);
 }
 
 .chip:hover {
-  background: var(--surface-2);
+  background: var(--glass-strong);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    0 0 16px var(--primary-glow);
 }
 
 .chip:has(:checked) {
-  border-color: var(--primary);
+  border-color: light-dark(rgb(30 99 196 / 55%), rgb(108 178 255 / 60%));
   background: var(--primary-container);
   color: var(--on-primary-container);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    0 0 20px var(--primary-glow);
 }
 
 .chip:has(:focus-visible) {
@@ -378,14 +466,15 @@ fieldset legend {
   block-size: 1px;
 }
 
-/* 区间分段：M3 button group —— 选中段填充主色 */
+/* 区间分段：玻璃 button group，选中段主色渐变 + 发光 */
 .segmented {
   gap: 0;
-  border: 1px solid var(--outline);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-pill);
   overflow: hidden;
   inline-size: fit-content;
-  background: var(--surface);
+  background: var(--glass);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
 }
 
 .segmented legend {
@@ -402,13 +491,16 @@ fieldset legend {
   align-items: center;
   justify-content: center;
   min-block-size: 44px;
-  padding: 0 1.1rem;
+  padding: 0 1.15rem;
   font-size: 0.88rem;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   color: var(--fg-muted);
   border-inline-end: 1px solid var(--outline-soft);
-  transition: background-color var(--duration) var(--ease), color var(--duration) var(--ease);
+  transition:
+    background-color var(--duration) var(--ease),
+    color var(--duration) var(--ease),
+    box-shadow var(--duration) var(--ease);
 }
 
 .segmented__item:first-of-type {
@@ -423,13 +515,14 @@ fieldset legend {
 }
 
 .segmented__item:hover {
-  background: var(--surface-2);
+  background: var(--glass-strong);
 }
 
 .segmented__item:has(:checked) {
-  background: var(--primary);
+  background: linear-gradient(135deg, var(--primary), var(--grade-p92-lite));
   color: var(--on-primary);
-  font-weight: 600;
+  font-weight: 700;
+  box-shadow: 0 0 22px var(--primary-glow);
 }
 
 .segmented__item:has(:focus-visible) {
@@ -460,7 +553,7 @@ fieldset legend {
   accent-color: var(--primary);
 }
 
-/* ---------- 价格卡片（KPI card） ---------- */
+/* ---------- 价格卡片（KPI 玻璃卡 + 渐变大字） ---------- */
 
 .card-grid {
   display: grid;
@@ -476,50 +569,96 @@ fieldset legend {
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
-  padding: 0.95rem 1rem 0.85rem;
-  background: var(--surface);
-  border: 1px solid light-dark(rgb(26 28 30 / 6%), rgb(255 255 255 / 6%));
+  padding: 1rem 1rem 0.9rem;
   border-radius: var(--radius);
-  box-shadow: var(--shadow-1);
-  border-block-start: 3px solid var(--grade-p92);
+  transition:
+    border-color var(--duration) var(--ease),
+    box-shadow var(--duration) var(--ease);
 }
 
-.card[data-grade='p95'] {
-  border-block-start-color: var(--grade-p95);
+.card:hover {
+  border-color: light-dark(rgb(23 32 58 / 18%), rgb(255 255 255 / 24%));
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    0 10px 28px light-dark(rgb(23 32 58 / 10%), rgb(0 0 0 / 45%)),
+    0 0 24px light-dark(var(--primary-glow), var(--primary-glow));
 }
 
-.card[data-grade='p98'] {
-  border-block-start-color: var(--grade-p98);
+/* 卡片顶部的标号光条 */
+.card::before {
+  content: '';
+  position: absolute;
+  inset-inline: 1rem;
+  inset-block-start: 0;
+  block-size: 3px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(90deg, var(--grade-p92), transparent);
 }
 
-.card[data-grade='p0'] {
-  border-block-start-color: var(--grade-p0);
+.card[data-grade='p95']::before {
+  background: linear-gradient(90deg, var(--grade-p95), transparent);
 }
 
-.card[data-grade='p89'] {
-  border-block-start-color: var(--grade-p89);
+.card[data-grade='p98']::before {
+  background: linear-gradient(90deg, var(--grade-p98), transparent);
+}
+
+.card[data-grade='p0']::before {
+  background: linear-gradient(90deg, var(--grade-p0), transparent);
+}
+
+.card[data-grade='p89']::before {
+  background: linear-gradient(90deg, var(--grade-p89), transparent);
 }
 
 .card__title {
   font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.05em;
   color: var(--fg-muted);
+  margin-block-start: 0.35rem;
 }
 
 .price {
   display: flex;
   align-items: baseline;
   gap: 0.3rem;
-  margin: 0.1rem 0 0.15rem;
+  margin: 0.1rem 0 0.2rem;
 }
 
+/* 价格大字：按标号渐变着色（不支持 background-clip:text 时回退实色） */
 .price__value {
-  font-size: clamp(1.75rem, 7vw, 2.3rem);
-  font-weight: 700;
+  font-size: clamp(1.8rem, 7.5vw, 2.4rem);
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.015em;
   line-height: 1.1;
+  color: var(--grade-p92);
+}
+
+@supports (-webkit-background-clip: text) or (background-clip: text) {
+  .price__value {
+    background: linear-gradient(135deg, var(--grade-p92), var(--grade-p92-lite));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .card[data-grade='p95'] .price__value {
+    background: linear-gradient(135deg, var(--grade-p95), var(--grade-p95-lite));
+  }
+
+  .card[data-grade='p98'] .price__value {
+    background: linear-gradient(135deg, var(--grade-p98), var(--grade-p98-lite));
+  }
+
+  .card[data-grade='p0'] .price__value {
+    background: linear-gradient(135deg, var(--grade-p0), var(--grade-p0-lite));
+  }
+
+  .card[data-grade='p89'] .price__value {
+    background: linear-gradient(135deg, var(--grade-p89), var(--grade-p89-lite));
+  }
 }
 
 .price__unit {
@@ -537,14 +676,14 @@ fieldset legend {
   font-variant-numeric: tabular-nums;
 }
 
-/* 涨跌徽标：container 色对的 pill（不只靠颜色——带 ↑/↓ 符号） */
+/* 涨跌徽标：container 色对 + 柔光的 pill（不只靠颜色——带 ↑/↓ 符号） */
 .delta {
   display: inline-flex;
   align-items: center;
-  padding: 0.12rem 0.55rem;
+  padding: 0.14rem 0.6rem;
   border-radius: var(--radius-pill);
   font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -552,11 +691,13 @@ fieldset legend {
 .delta--up {
   color: var(--on-up-container);
   background: var(--up-container);
+  box-shadow: 0 0 14px var(--up-glow);
 }
 
 .delta--down {
   color: var(--on-down-container);
   background: var(--down-container);
+  box-shadow: 0 0 14px var(--down-glow);
 }
 
 .delta--flat {
@@ -572,15 +713,6 @@ fieldset legend {
 
 /* ---------- 图表 ---------- */
 
-.chart-figure {
-  margin: 0;
-  padding: 1.1rem;
-  background: var(--surface);
-  border: 1px solid light-dark(rgb(26 28 30 / 8%), rgb(255 255 255 / 8%));
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-1);
-}
-
 .chart-figure__caption {
   display: flex;
   flex-wrap: wrap;
@@ -588,7 +720,7 @@ fieldset legend {
   justify-content: space-between;
   gap: 0.4rem;
   font-size: 0.95rem;
-  font-weight: 600;
+  font-weight: 700;
   margin-block-end: 0.6rem;
 }
 
@@ -615,6 +747,11 @@ fieldset legend {
   }
 }
 
+/* 曲线发光：颜色走 currentColor（chart.js 会同步设置 style.color） */
+#chart path {
+  filter: drop-shadow(0 0 4px currentColor);
+}
+
 .chart-cursor {
   position: absolute;
   inset-block: 0;
@@ -633,10 +770,12 @@ fieldset legend {
   font-size: 0.78rem;
   line-height: 1.45;
   color: var(--fg);
-  background: var(--surface);
-  border: 1px solid var(--outline-soft);
+  background: var(--glass-strong);
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-1);
+  box-shadow: 0 8px 24px light-dark(rgb(23 32 58 / 12%), rgb(0 0 0 / 45%));
   pointer-events: none;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
@@ -654,7 +793,8 @@ fieldset legend {
   text-align: center;
   font-size: 0.8rem;
   color: var(--fg-muted);
-  background: var(--surface-2);
+  background: var(--glass);
+  border: 1px dashed var(--outline-soft);
   border-radius: var(--radius-sm);
 }
 
@@ -747,10 +887,19 @@ fieldset legend {
 /* ---------- 高对比度与动效 ---------- */
 
 @media (forced-colors: active) {
-  .card,
+  .glass,
   .panel,
-  .chart-figure {
+  .chart-figure,
+  .card {
+    background: Canvas;
     border: 1px solid CanvasText;
+    backdrop-filter: none;
+  }
+
+  .price__value,
+  .topbar__title h1 {
+    background: none;
+    color: CanvasText;
   }
 }
 

@@ -229,8 +229,12 @@ export function renderChart(svg, options = {}) {
   const grid = cssVar('--outline-soft', '#c4c7ce');
 
   // 颜色一律走 style（CSS 属性）：light-dark() 是 CSS 函数，写成 SVG 属性不解析
+  // stroke 与 color 同步设置：CSS 里的曲线发光用 currentColor
   const paint = (node, { stroke, fill } = {}) => {
-    if (stroke) node.style.stroke = stroke;
+    if (stroke) {
+      node.style.stroke = stroke;
+      node.style.color = stroke;
+    }
     if (fill) node.style.fill = fill;
     return node;
   };
@@ -289,7 +293,7 @@ export function renderChart(svg, options = {}) {
     const color = gradeColor(path.grade);
     if (path.d) {
       const step = el('path', {
-        d: path.d, fill: 'none', 'stroke-width': 2,
+        d: path.d, fill: 'none', 'stroke-width': 2.5,
         'stroke-linejoin': 'round', 'stroke-linecap': 'round',
         ...(GRADE_DASH[path.grade] ? { 'stroke-dasharray': GRADE_DASH[path.grade] } : {}),
       });
@@ -298,7 +302,7 @@ export function renderChart(svg, options = {}) {
     }
     for (const marker of path.markers) {
       const dot = el('circle', {
-        cx: marker.x, cy: marker.y, r: 3.5, 'stroke-width': 1.5,
+        cx: marker.x, cy: marker.y, r: 4, 'stroke-width': 1.5,
       });
       paint(dot, { fill: color, stroke: cssVar('--surface', '#ffffff') });
       svg.append(dot);
