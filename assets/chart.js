@@ -3,7 +3,7 @@
  * 几何计算是纯函数（可在 node 里测），DOM 部分在浏览器里跑。
  */
 
-import { parseDateOnly, buildStepPath } from './logic.js';
+import { parseDateOnly, buildSmoothPath } from './logic.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -185,7 +185,7 @@ export function buildChartModel({ series = [], points = null, overlay = null, wi
 
   const paths = normalizedSeries.map((entry) => ({
     grade: entry.grade,
-    d: buildStepPath(entry.values ?? [], scales.x, scales.y),
+    d: buildSmoothPath(entry.values ?? [], scales.x, scales.y),
     markers: (entry.values ?? [])
       .filter(([, value]) => value !== null && value !== undefined && Number.isFinite(value))
       .map(([date, value]) => ({ date, value, x: scales.x(date), y: scales.y(value) })),
@@ -202,7 +202,7 @@ export function buildChartModel({ series = [], points = null, overlay = null, wi
 
   let overlayPath = null;
   if (overlay && overlay.length && scales.y2) {
-    overlayPath = buildStepPath(overlay, scales.x, scales.y2);
+    overlayPath = buildSmoothPath(overlay, scales.x, scales.y2);
   }
 
   return { scales, plot, paths, xLabels, yLabels, rightLabels, overlayPath };
@@ -288,7 +288,7 @@ export function renderChart(svg, options = {}) {
     svg.append(text);
   }
 
-  // 阶梯线 + 调价点（每档线型与图例一致）
+  // 趋势曲线 + 调价点（每档线型与图例一致）
   for (const path of model.paths) {
     const color = gradeColor(path.grade);
     if (path.d) {

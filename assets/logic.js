@@ -1,5 +1,5 @@
 /**
- * 前端纯逻辑：区间切片、阶梯路径、格式化、空态判定。
+ * 前端纯逻辑：区间切片、平滑曲线路径、格式化、空态判定。
  * 纯 ESM、无 DOM 依赖 —— node 与浏览器共用同一份实现。
  */
 
@@ -20,7 +20,7 @@ export function parseDateOnly(value) {
 /**
  * 取区间的下标范围。
  * - rangeStartIdx：区间内第一个窗口的下标（区间内没有窗口时为 dates.length）
- * - startIdx：图表起点，比 rangeStartIdx 早一个窗口 —— 阶梯线需要区间前的那个点作为起始水平段
+ * - startIdx：图表起点，比 rangeStartIdx 早一个窗口 —— 曲线需要区间前的那个点作为起始段，趋势才完整
  */
 export function selectRange(dates, rangeKey, now) {
   const days = RANGES[rangeKey] ?? RANGES.month;
@@ -46,10 +46,12 @@ export function sliceSeries(dates, prices, startIdx, endIdx) {
 }
 
 /**
- * 阶梯线路径：价格只在调价日跳变，调价之间保持不变。
- * 空值处断开成新的一段（不跨空值连线）。
+ * 平滑曲线路径（Fritsch–Carlson 单调三次插值 → 三次贝塞尔）：
+ * - 调价点稀疏时比阶梯线好看，且单调约束保证陡变处不过冲、不产生数据里不存在的假峰
+ * - 平价数据退化为直线；空值处断开成新的一段
+ * 注意：曲线只是趋势的视觉连接，真实数据点由图表上的圆点标记。
  */
-export function buildStepPath(points, x, y) {
+export function buildSmoothPath(points, x, y) {
   const segments = [];
   let current = null;
   for (const [date, value] of points) {
@@ -57,17 +59,58 @@ export function buildStepPath(points, x, y) {
       current = null;
       continue;
     }
-    const px = x(date);
-    const py = y(value);
+    const point = [x(date), y(value)];
     if (current === null) {
-      segments.push(`M${px} ${py}`);
+      current = [point];
+      segments.push(current);
     } else {
-      segments.push(`L${px} ${current.y}`);
-      segments.push(`L${px} ${py}`);
+      current.push(point);
     }
-    current = { x: px, y: py };
   }
-  return segments.join(' ');
+
+  const round = (n) => Math.round(n * 100) / 100;
+  const parts = [];
+  for (const segment of segments) {
+    if (segment.length === 0) continue;
+    parts.push(`M${round(segment[0][0])} ${round(segment[0][1])}`);
+    if (segment.length === 1) continue;
+
+    const n = segment.length;
+    const dx = [];
+    const slope = [];
+    for (let i = 0; i < n - 1; i += 1) {
+      dx[i] = segment[i + 1][0] - segment[i][0];
+      slope[i] = (segment[i + 1][1] - segment[i][1]) / dx[i];
+    }
+    const tangent = new Array(n);
+    tangent[0] = slope[0];
+    tangent[n - 1] = slope[n - 2];
+    for (let i = 1; i < n - 1; i += 1) {
+      if (slope[i - 1] * slope[i] <= 0) {
+        tangent[i] = 0;
+      } else {
+        tangent[i] = (slope[i - 1] + slope[i]) / 2;
+      }
+    }
+    // Fritsch–Carlson 防过冲：切向量限制在 3 倍局部斜率内
+    for (let i = 0; i < n - 1; i += 1) {
+      const limit = 3 * Math.abs(slope[i]);
+      if (Math.abs(tangent[i]) > limit) tangent[i] = Math.sign(tangent[i]) * limit;
+      if (Math.abs(tangent[i + 1]) > limit) tangent[i + 1] = Math.sign(tangent[i + 1]) * limit;
+    }
+
+    for (let i = 0; i < n - 1; i += 1) {
+      const h = dx[i];
+      const c1x = segment[i][0] + h / 3;
+      const c1y = segment[i][1] + (tangent[i] * h) / 3;
+      const c2x = segment[i + 1][0] - h / 3;
+      const c2y = segment[i + 1][1] - (tangent[i + 1] * h) / 3;
+      parts.push(
+        `C${round(c1x)} ${round(c1y)}, ${round(c2x)} ${round(c2y)}, ${round(segment[i + 1][0])} ${round(segment[i + 1][1])}`,
+      );
+    }
+  }
+  return parts.join(' ');
 }
 
 /** 当前价：最后一个有效值。 */

@@ -4,7 +4,7 @@ import {
   RANGES,
   selectRange,
   sliceSeries,
-  buildStepPath,
+  buildSmoothPath,
   currentPrice,
   latestAdjustment,
   formatPrice,
@@ -50,7 +50,7 @@ test('selectRange: 区间早于全部数据时 startIdx 为 0', () => {
   assert.equal(endIdx, DATES.length - 1);
 });
 
-test('selectRange: 图表起点包含区间前的那个窗口（阶梯线的起始水平段）', () => {
+test('selectRange: 图表起点包含区间前的那个窗口（曲线的起始段）', () => {
   const { startIdx, rangeStartIdx } = selectRange(DATES, 'week', NOW);
   assert.equal(rangeStartIdx, 3, '区间内第一个窗口是 11-20');
   assert.equal(startIdx, 2, '图表从区间前一个窗口（11-13）起画');
@@ -68,30 +68,57 @@ test('sliceSeries 截取区间内的序列并保持对齐', () => {
   assert.deepEqual(sliced, [['2026-11-07', 2], ['2026-11-13', 3]]);
 });
 
-test('buildStepPath 走阶梯而不是直线插值', () => {
+test('buildSmoothPath 两点间用一条三次贝塞尔连接', () => {
   const points = [['2026-01-01', 8.0], ['2026-01-11', 8.5]];
   const x = (d) => Number(d.slice(-2));
   const y = (v) => v;
-  const path = buildStepPath(points, x, y);
-  const commands = path.match(/[ML]/g) ?? [];
-  assert.equal(commands.length, 3, '应为 1 个 M + 2 个 L');
+  const path = buildSmoothPath(points, x, y);
   assert.ok(path.startsWith('M'));
-  // 第一段必须是水平移动（y 保持不变），这正是阶梯线的定义
-  const firstL = path.match(/L[\d.]+ [\d.]+/)[0];
-  const [, firstLy] = firstL.split(' ').map(Number);
-  assert.equal(firstLy, 8.0);
+  assert.equal((path.match(/C/g) ?? []).length, 1, '应为 1 个 C 命令');
+  assert.ok(path.endsWith('11 8.5'), `终点应是第二个点，实际 ${path}`);
 });
 
-test('buildStepPath 跳过空值且不产生 NaN', () => {
+test('buildSmoothPath n 个点产出 n-1 条曲线段', () => {
+  const points = [['2026-01-01', 8.0], ['2026-01-11', 8.5], ['2026-01-21', 8.2], ['2026-01-31', 8.6]];
+  const path = buildSmoothPath(points, (d) => Number(d.slice(-2)), (v) => v);
+  assert.equal((path.match(/C/g) ?? []).length, 3);
+  assert.equal((path.match(/M/g) ?? []).length, 1);
+});
+
+test('buildSmoothPath 平价数据退化为直线（控制点不偏离）', () => {
+  const points = [['2026-01-01', 8.0], ['2026-01-11', 8.0], ['2026-01-21', 8.0]];
+  const path = buildSmoothPath(points, (d) => Number(d.slice(-2)), (v) => v);
+  const numbers = (path.match(/-?[\d.]+/g) ?? []).map(Number);
+  const ys = numbers.filter((_, i) => i % 2 === 1);
+  assert.ok(ys.every((value) => value === 8), `平价曲线的 y 全应为 8：${ys.join(',')}`);
+});
+
+test('buildSmoothPath 单调数据不过冲（所有 y 落在数据值域内）', () => {
+  const points = [['2026-01-01', 8.0], ['2026-01-11', 8.6], ['2026-01-21', 8.2], ['2026-01-31', 8.7]];
+  const path = buildSmoothPath(points, (d) => Number(d.slice(-2)), (v) => v);
+  const numbers = (path.match(/-?[\d.]+/g) ?? []).map(Number);
+  const ys = numbers.filter((_, i) => i % 2 === 1);
+  assert.ok(
+    ys.every((value) => value >= 8.0 - 0.01 && value <= 8.7 + 0.01),
+    `曲线 y 超出数据值域 [8.0, 8.7]：${ys.join(',')}`,
+  );
+});
+
+test('buildSmoothPath 跳过空值且不产生 NaN', () => {
   const points = [['2026-01-01', 8.0], ['2026-01-11', null], ['2026-01-21', 8.5]];
-  const path = buildStepPath(points, (d) => Number(d.slice(-2)), (v) => v);
+  const path = buildSmoothPath(points, (d) => Number(d.slice(-2)), (v) => v);
   assert.ok(!path.includes('NaN'));
   assert.equal((path.match(/M/g) ?? []).length, 2, '空值处断开成新的一段');
 });
 
-test('buildStepPath 全部为空值时返回空串', () => {
-  const path = buildStepPath([['2026-01-01', null]], (d) => 1, (v) => v);
+test('buildSmoothPath 全部为空值时返回空串', () => {
+  const path = buildSmoothPath([['2026-01-01', null]], (d) => 1, (v) => v);
   assert.equal(path, '');
+});
+
+test('buildSmoothPath 单点只有 M 命令', () => {
+  const path = buildSmoothPath([['2026-01-01', 8.0]], (d) => 5, (v) => v);
+  assert.equal(path, 'M5 8');
 });
 
 test('currentPrice 取最后一个有效值', () => {
