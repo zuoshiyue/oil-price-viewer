@@ -203,7 +203,7 @@ a {
   font-size: 1.5rem;
   font-weight: 800;
   letter-spacing: 0.01em;
-  background: linear-gradient(120deg, var(--fg) 30%, var(--primary));
+  background-image: linear-gradient(120deg, var(--fg) 30%, var(--primary));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -636,28 +636,52 @@ fieldset legend {
   color: var(--grade-p92);
 }
 
+.card[data-grade='p95'] .price__value {
+  color: var(--grade-p95);
+}
+
+.card[data-grade='p98'] .price__value {
+  color: var(--grade-p98);
+}
+
+.card[data-grade='p0'] .price__value {
+  color: var(--grade-p0);
+}
+
+.card[data-grade='p89'] .price__value {
+  color: var(--grade-p89);
+}
+
 @supports (-webkit-background-clip: text) or (background-clip: text) {
+  /* 注意：必须用 background-image 长属性 —— background 简写会把
+     background-clip 重置回 border-box，导致 color:transparent 的文字隐形。
+     且 per-grade 规则要重申 color:transparent —— 外层实色回退特异度相同但更早，
+     不重申的话实色会盖住渐变。 */
   .price__value {
-    background: linear-gradient(135deg, var(--grade-p92), var(--grade-p92-lite));
+    background-image: linear-gradient(135deg, var(--grade-p92), var(--grade-p92-lite));
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
   }
 
   .card[data-grade='p95'] .price__value {
-    background: linear-gradient(135deg, var(--grade-p95), var(--grade-p95-lite));
+    background-image: linear-gradient(135deg, var(--grade-p95), var(--grade-p95-lite));
+    color: transparent;
   }
 
   .card[data-grade='p98'] .price__value {
-    background: linear-gradient(135deg, var(--grade-p98), var(--grade-p98-lite));
+    background-image: linear-gradient(135deg, var(--grade-p98), var(--grade-p98-lite));
+    color: transparent;
   }
 
   .card[data-grade='p0'] .price__value {
-    background: linear-gradient(135deg, var(--grade-p0), var(--grade-p0-lite));
+    background-image: linear-gradient(135deg, var(--grade-p0), var(--grade-p0-lite));
+    color: transparent;
   }
 
   .card[data-grade='p89'] .price__value {
-    background: linear-gradient(135deg, var(--grade-p89), var(--grade-p89-lite));
+    background-image: linear-gradient(135deg, var(--grade-p89), var(--grade-p89-lite));
+    color: transparent;
   }
 }
 
