@@ -3,7 +3,7 @@
  * 几何计算是纯函数（可在 node 里测），DOM 部分在浏览器里跑。
  */
 
-import { parseDateOnly, buildSmoothPath } from './logic.js?v=20261126.5';
+import { parseDateOnly, buildSmoothPath } from './logic.js?v=20261126.6';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
