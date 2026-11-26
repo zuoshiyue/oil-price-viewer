@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta
+      name="description"
+      content="全国 31 省 92/95/98 号汽油与 0 号柴油的当前价格，以及近一周、近一月、近一年的调价走势曲线。"
+    />
+    <title>油价看板 · 92/95/98/0 号油价与走势</title>
+    <script>
+      // 仅用于避免主题闪烁：把用户偏好写回 meta，后续 CSS 通过 :has() 读取。
+      try {
+        var stored = localStorage.getItem('oil-price-viewer:color-scheme');
+        if (stored === 'light' || stored === 'dark') {
+          document.querySelector('meta[name="color-scheme"]').content = stored;
+        }
+      } catch (e) {
+        /* 隐私模式或禁用存储时忽略，主题仍跟随系统 */
+      }
+    </script>
+    <link rel="stylesheet" href="./assets/styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">跳到主内容</a>
+
+    <header class="topbar">
+      <div class="topbar__title">
+        <h1>油价看板</h1>
+        <p class="topbar__subtitle">发改委挂牌价 · 生效日口径</p>
+      </div>
+      <div class="topbar__tools">
+        <p class="meta" id="meta-bar" role="status">正在加载数据…</p>
+        <button type="button" id="refresh-btn" class="btn">刷新</button>
+        <button type="button" id="theme-toggle" class="btn btn--icon" aria-label="切换深色主题">
+          <span class="theme-toggle__light" aria-hidden="true">☀</span>
+          <span class="theme-toggle__dark" aria-hidden="true">☾</span>
+          <span class="visually-hidden">切换深色主题</span>
+        </button>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="panel" aria-labelledby="filters-heading">
+        <h2 id="filters-heading" class="panel__title">筛选</h2>
+
+        <div class="filters">
+          <div class="filters__row">
+            <label class="field" for="region-select">
+              <span class="field__label">省份 / 地区</span>
+              <select id="region-select" name="region">
+                <option value="national">全国参考均价</option>
+              </select>
+            </label>
+            <button type="button" id="locate-btn" class="btn btn--ghost">定位我的省份</button>
+          </div>
+
+          <fieldset class="chips" id="grade-chips">
+            <legend class="field__label">标号（可多选）</legend>
+            <label class="chip">
+              <input type="checkbox" name="grade" value="p92" data-grade="p92" checked />
+              <span>92# 汽油</span>
+            </label>
+            <label class="chip">
+              <input type="checkbox" name="grade" value="p95" data-grade="p95" />
+              <span>95# 汽油</span>
+            </label>
+            <label class="chip">
+              <input type="checkbox" name="grade" value="p98" data-grade="p98" />
+              <span>98# 汽油</span>
+            </label>
+            <label class="chip">
+              <input type="checkbox" name="grade" value="p0" data-grade="p0" />
+              <span>0# 柴油</span>
+            </label>
+            <label class="chip">
+              <input type="checkbox" name="grade" value="p89" data-grade="p89" />
+              <span>89# 汽油</span>
+            </label>
+          </fieldset>
+
+          <fieldset class="segmented" id="range-tabs">
+            <legend class="field__label">时间区间</legend>
+            <label class="segmented__item">
+              <input type="radio" name="range" value="week" data-range="week" />
+              <span>近一周</span>
+            </label>
+            <label class="segmented__item">
+              <input type="radio" name="range" value="month" data-range="month" checked />
+              <span>近一月</span>
+            </label>
+            <label class="segmented__item">
+              <input type="radio" name="range" value="year" data-range="year" />
+              <span>近一年</span>
+            </label>
+          </fieldset>
+
+          <label class="switch">
+            <input type="checkbox" id="overlay-toggle" checked />
+            <span>叠加国际原油（Brent，右轴）</span>
+          </label>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="current-heading">
+        <h2 id="current-heading" class="panel__title">当前油价</h2>
+        <div class="card-grid" id="price-cards">
+          <p class="placeholder">正在加载价格数据…</p>
+        </div>
+      </section>
+
+      <figure class="chart-figure">
+        <figcaption class="chart-figure__caption">
+          <span id="chart-title">油价走势</span>
+          <span class="chart-figure__hint">阶梯线表示价格只在调价日跳变，调价之间保持不变</span>
+        </figcaption>
+        <div class="chart-wrap">
+          <svg id="chart" role="img" aria-label="油价走势图" preserveAspectRatio="xMidYMid meet"></svg>
+          <p id="chart-empty" class="chart-empty" hidden></p>
+        </div>
+        <div class="legend" id="chart-legend"></div>
+      </figure>
+
+      <section class="panel" aria-labelledby="extra-heading">
+        <h2 id="extra-heading" class="panel__title">调价与国际原油</h2>
+        <div class="card-grid card-grid--two">
+          <article class="card" id="next-window">
+            <h3 class="card__title">下次调价</h3>
+            <p class="card__content">—</p>
+          </article>
+          <article class="card" id="crude-card">
+            <h3 class="card__title">国际原油</h3>
+            <p class="card__content">—</p>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>
+        数据来自公开数据源：<a href="https://quote.cngold.org/oil/youjia.html" rel="noreferrer noopener">金投网城市油价</a> ·
+        <a href="https://qt.gtimg.cn/q=hf_CL,hf_OIL" rel="noreferrer noopener">腾讯财经外盘</a> ·
+        <a href="https://quote.cngold.org/" rel="noreferrer noopener">金投网行情</a>
+      </p>
+      <p>
+        价格为发改委公布的挂牌价（生效日口径），<strong>非加油站实际成交价</strong>，仅供参考。全国参考均价为 31 省算术平均。
+      </p>
+      <p class="footer__muted">数据由 GitHub Actions 定时抓取并入库，页面读取仓库内快照。</p>
+    </footer>
+
+    <p id="status-live" class="visually-hidden" role="status" aria-live="polite"></p>
+
+    <script type="module" src="./assets/app.js"></script>
+  </body>
+</html>
