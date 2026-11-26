@@ -16,11 +16,11 @@ import {
   hasAdjustmentInRange,
   nearestByX,
   parseDateOnly,
-} from './logic.js';
-import { renderChart, GRADE_COLORS, GRADE_LABELS } from './chart.js';
+} from './logic.js?v=20261126.5';
+import { renderChart, GRADE_COLORS, GRADE_LABELS } from './chart.js?v=20261126.5';
 // 浏览器直接复用 CI 数据管道（Pages 上都是静态文件，node 测试同源可 import）
-import { buildSnapshot } from '../scripts/lib/transform.mjs';
-import { fetchOilTable, fetchNearTime, fetchCrudeSpot } from '../scripts/lib/upstream.mjs';
+import { buildSnapshot } from '../scripts/lib/transform.mjs?v=20261126.5';
+import { fetchOilTable, fetchNearTime, fetchCrudeSpot } from '../scripts/lib/upstream.mjs?v=20261126.5';
 
 const SNAPSHOT_URL = './data/oil-prices.json';
 const IP_GEO = 'https://ipinfo.io/json';
