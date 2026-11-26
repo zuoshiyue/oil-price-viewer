@@ -58,5 +58,8 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .
+      # artifact 元数据存在秒级传播延迟：不缓冲时 deploy-pages 会偶发"找不到 artifact"
+      - name: Wait for artifact metadata
+        run: sleep 15
       - id: deployment
         uses: actions/deploy-pages@v4
