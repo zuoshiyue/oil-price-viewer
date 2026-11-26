@@ -18,16 +18,65 @@ import {
   parseDateOnly,
 } from './logic.js';
 import { renderChart, GRADE_COLORS, GRADE_LABELS } from './chart.js';
+// 浏览器直接复用 CI 数据管道（Pages 上都是静态文件，node 测试同源可 import）
+import { buildSnapshot } from '../scripts/lib/transform.mjs';
+import { fetchOilTable, fetchNearTime, fetchCrudeSpot } from '../scripts/lib/upstream.mjs';
 
 const SNAPSHOT_URL = './data/oil-prices.json';
-const UPSTREAM_TABLE = 'https://datacenter.cngold.org/city_oil/all_price_by_year/';
-const UPSTREAM_NEAR_TIME = 'https://datacenter.cngold.org/city_oil/near_time/';
-const UPSTREAM_CRUDE = 'https://qt.gtimg.cn/q=hf_CL,hf_OIL';
 const IP_GEO = 'https://ipinfo.io/json';
 const STALE_HOURS = 6;
 const STORAGE_KEY = 'oil-price-viewer:color-scheme';
 
 const CARD_GRADES = ['p92', 'p95', 'p98', 'p0'];
+
+/** ipinfo 的英文省名 → 快照里的中文省名（键必须与 cngold 的 regionName 完全一致）。 */
+const REGION_EN_TO_CN = {
+  Beijing: '北京市',
+  Tianjin: '天津市',
+  Shanghai: '上海市',
+  Chongqing: '重庆市',
+  Hebei: '河北省',
+  Shanxi: '山西省',
+  'Inner Mongolia': '内蒙古',
+  Liaoning: '辽宁省',
+  Jilin: '吉林省',
+  Heilongjiang: '黑龙江省',
+  Jiangsu: '江苏省',
+  Zhejiang: '浙江省',
+  Anhui: '安徽省',
+  Fujian: '福建省',
+  Jiangxi: '江西省',
+  Shandong: '山东省',
+  Henan: '河南省',
+  Hubei: '湖北省',
+  Hunan: '湖南省',
+  Guangdong: '广东省',
+  Guangxi: '广西',
+  Hainan: '海南省',
+  Sichuan: '四川省',
+  Guizhou: '贵州省',
+  Yunnan: '云南省',
+  Tibet: '西藏',
+  Shaanxi: '陕西省',
+  Gansu: '甘肃省',
+  Qinghai: '青海省',
+  Ningxia: '宁夏',
+  Xinjiang: '新疆',
+};
+
+/** 用英文省名（ipinfo）匹配快照里的中文省名，匹配不到返回 null。 */
+export function matchRegionName(region, names) {
+  if (!region || !Array.isArray(names)) return null;
+  const input = String(region).trim();
+  if (!input) return null;
+  // 中文输入直接匹配
+  const direct = names.find((name) => name === input || name.includes(input) || input.includes(name));
+  if (direct) return direct;
+  // 英文输入查映射表（含易混对：Shanxi=山西 / Shaanxi=陕西）
+  const mapped = REGION_EN_TO_CN[input];
+  if (mapped && names.includes(mapped)) return mapped;
+  return null;
+}
 
 /** 把 ISO 时间戳格式化成北京时间字符串。 */
 function formatStamp(value) {
@@ -66,13 +115,14 @@ export function deriveView(snapshot, state, now = new Date()) {
     const series = region?.[grade] ?? [];
     let delta = null;
     let date = null;
-    if (grade === 'p89') {
+    if (grade === 'p89' || !region?.lastAdjust) {
+      // 89 号或 lastAdjust 缺失时逐档回退计算（实时补齐路径必须仍有涨跌徽标）
       const adjustment = latestAdjustment(series, dates);
       if (adjustment) {
         delta = adjustment.delta;
         date = adjustment.date;
       }
-    } else if (region?.lastAdjust) {
+    } else {
       delta = region.lastAdjust[grade] ?? null;
       date = region.lastAdjust.date ?? null;
     }
@@ -123,61 +173,21 @@ export function deriveView(snapshot, state, now = new Date()) {
 }
 
 /**
- * 把上游原始行转成页面能用的快照（与 CI 的契约一致，但只取展示所需字段）。
- * 实时补齐没有历史累积，因此只包含上游给出的窗口。
+ * 浏览器实时补齐：上游新行与既有快照合并。
+ * 与 CI 的 buildSnapshot 同一条管道 —— 累积历史、原油序列、全国均价、
+ * lastAdjust 全部保留或重算，实时刷新不会让页面降级。
  */
-export function buildLiveSnapshot(rows) {
-  const dates = [...new Set(rows.map((row) => row.date))].sort();
-  const gradeFields = { p92: 'n92', p95: 'n95', p98: 'n98', p0: 'n0', p89: 'n89' };
-  const clean = (value) => {
-    const num = Number(value);
-    return Number.isFinite(num) && num > 0 ? num : null;
-  };
-  const regions = {};
-  for (const row of rows) {
-    if (!row?.regionName) continue;
-    if (!regions[row.regionName]) {
-      regions[row.regionName] = { regionId: row.regionId, p92: [], p95: [], p98: [], p0: [], p89: [] };
-    }
-    const index = dates.indexOf(row.date);
-    for (const [grade, field] of Object.entries(gradeFields)) {
-      regions[row.regionName][grade][index] = clean(row[field]);
-    }
-  }
-
-  const byName = {};
-  for (const [name, region] of Object.entries(regions)) {
-    byName[name] = {
-      regionId: region.regionId,
-      ...Object.fromEntries(Object.entries(gradeFields).map(([grade]) => [grade, region[grade]])),
-      lastAdjust: null,
-    };
-  }
-
-  // 全国参考均价：各省算术平均，缺值省份不参与
-  const national = {};
-  for (const grade of Object.keys(gradeFields)) {
-    national[grade] = dates.map((_, index) => {
-      let sum = 0;
-      let count = 0;
-      for (const region of Object.values(byName)) {
-        const value = region[grade][index];
-        if (value === null) continue;
-        sum += value;
-        count += 1;
-      }
-      return count ? Math.round((sum / count + Number.EPSILON) * 100) / 100 : null;
-    });
-  }
-  national.lastAdjust = null;
-
-  return {
-    meta: { generatedAt: new Date().toISOString(), schemaVersion: 2, nextWindow: null, crude: null },
-    dates,
-    national,
-    regions: byName,
-    crudeDaily: { brent: [] },
-  };
+export function applyLiveUpdate(existing, rows, generatedAt = new Date().toISOString()) {
+  return buildSnapshot({
+    rows,
+    nearTime: existing?.meta
+      ? { lastWindow: existing.meta.lastWindow, nextWindow: existing.meta.nextWindow }
+      : null,
+    crude: existing?.meta?.crude ?? null,
+    crudeDaily: existing?.crudeDaily?.brent ?? [],
+    existing,
+    generatedAt,
+  });
 }
 
 /* ------------------------------------------------------------------ */
@@ -235,6 +245,7 @@ function bootstrap() {
       const card = view.cards[grade];
       const article = document.createElement('article');
       article.className = 'card';
+      article.dataset.grade = grade;
 
       const title = document.createElement('h3');
       title.className = 'card__title';
@@ -405,32 +416,23 @@ function bootstrap() {
     state.overlay = dom.overlayToggle.checked;
   }
 
-  /** 上游主表直连：只在快照过期或用户主动刷新时使用。 */
+  /** 上游主表直连：只在快照过期或用户主动刷新时使用（复用 CI 抓取层，自带重试与截断校验）。 */
   async function fetchLiveTable() {
-    const response = await fetch(UPSTREAM_TABLE, { headers: { Accept: 'application/json' }, cache: 'no-store' });
-    if (!response.ok) throw new Error(`上游返回 ${response.status}`);
-    const payload = await response.json();
-    if (payload?.returnCode !== 0 || !Array.isArray(payload.data)) throw new Error('上游数据格式异常');
-    return payload.data;
+    return fetchOilTable();
   }
 
-
   async function refreshLive({ force = false } = {}) {
-    if (!force && snapshot && !deriveView(snapshot, state, new Date()).stale) return;
+    if (!snapshot) {
+      // 首次加载都失败了：刷新按钮退化为重新加载页面数据
+      await load();
+      return;
+    }
+    if (!force && !deriveView(snapshot, state, new Date()).stale) return;
     setMeta('正在拉取最新数据…');
     try {
       const rows = await fetchLiveTable();
-      const live = buildLiveSnapshot(rows);
-      const existing = snapshot;
-      // 用实时数据替换价格序列，其余字段沿用快照（实时表没有历史累积，也就没有旧历史）
-      snapshot = {
-        ...existing,
-        meta: { ...existing.meta, generatedAt: live.meta.generatedAt },
-        dates: live.dates,
-        national: live.national,
-        regions: live.regions,
-        crudeDaily: live.crudeDaily,
-      };
+      // 与既有快照合并：累积历史、原油序列、涨跌口径全部保留
+      snapshot = applyLiveUpdate(snapshot, rows);
       liveMode = true;
       render();
       announce('已更新到最新油价数据');
@@ -444,41 +446,15 @@ function bootstrap() {
 
   async function refreshExtras() {
     const extra = { nextWindow: null, crude: null };
+    // 辅助端点直接复用 CI 抓取层（含重试与 GBK 解码），失败时回退快照值
     try {
-      const response = await fetch(UPSTREAM_NEAR_TIME, { headers: { Accept: 'application/json' } });
-      const payload = await response.json();
-      const rows = Array.isArray(payload?.data) ? payload.data : [];
-      if (rows[1]) {
-        extra.nextWindow = {
-          date: rows[1].date,
-          gasolineChange: rows[1].gasolineChange ?? null,
-          dieselChange: rows[1].dieselChange ?? null,
-        };
-      }
+      const nearTime = await fetchNearTime();
+      extra.nextWindow = nearTime?.nextWindow ?? null;
     } catch {
       /* 用快照里的值 */
     }
     try {
-      const response = await fetch(UPSTREAM_CRUDE);
-      const buffer = await response.arrayBuffer();
-      const text = new TextDecoder('gbk').decode(buffer);
-      const pick = (symbol) => {
-        const match = text.match(new RegExp(`v_${symbol}="([^"]*)"`));
-        if (!match) return null;
-        const fields = match[1].split(',');
-        return { price: Number(fields[0]), change: Number(fields[1]) };
-      };
-      const wti = pick('hf_CL');
-      const brent = pick('hf_OIL');
-      if (wti && brent) {
-        extra.crude = {
-          wti: wti.price,
-          brent: brent.price,
-          wtiChange: wti.change,
-          brentChange: brent.change,
-          time: '',
-        };
-      }
+      extra.crude = await fetchCrudeSpot();
     } catch {
       /* 用快照里的值 */
     }
@@ -493,8 +469,8 @@ function bootstrap() {
     try {
       const response = await fetch(IP_GEO);
       const info = await response.json();
-      const region = String(info.region ?? '');
-      const match = Object.keys(snapshot?.regions ?? {}).find((name) => name.includes(region) || region.includes(name.replace(/省|市|自治区|壮族|回族|维吾尔|特别行政区/g, '')));
+      // ipinfo 返回英文省名（如 Beijing），需要映射到快照里的中文省名
+      const match = matchRegionName(info.region, snapshot ? Object.keys(snapshot.regions) : []);
       if (match) {
         state.regionKey = match;
         dom.regionSelect.value = match;

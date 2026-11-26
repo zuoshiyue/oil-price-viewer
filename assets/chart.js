@@ -7,7 +7,7 @@ import { parseDateOnly, buildStepPath } from './logic.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
-/** 各标号的线条颜色（与 styles.css 里的图例一致）。 */
+/** 各标号的线条颜色（回退值；实际运行时优先读 CSS 变量 --grade-pXX）。 */
 export const GRADE_COLORS = {
   p92: '#2563eb',
   p95: '#b45309',
@@ -15,6 +15,19 @@ export const GRADE_COLORS = {
   p0: '#0e7490',
   p89: '#9d174d',
 };
+
+/** 各标号的线型（与图例一致：多序列不只靠颜色区分）。 */
+export const GRADE_DASH = {
+  p92: null,
+  p95: '6 3',
+  p98: '2 3',
+  p0: '9 4',
+  p89: '4 2 1 2',
+};
+
+function gradeColor(grade) {
+  return cssVar(`--grade-${grade}`, GRADE_COLORS[grade] ?? '#2563eb');
+}
 
 const GRADE_LABELS = {
   p92: '92# 汽油',
@@ -213,16 +226,24 @@ export function renderChart(svg, options = {}) {
   svg.setAttribute('height', String(height));
 
   const fgMuted = cssVar('--fg-muted', '#5b636c');
-  const border = cssVar('--border', '#e2e5ea');
+  const grid = cssVar('--outline-soft', '#c4c7ce');
+
+  // 颜色一律走 style（CSS 属性）：light-dark() 是 CSS 函数，写成 SVG 属性不解析
+  const paint = (node, { stroke, fill } = {}) => {
+    if (stroke) node.style.stroke = stroke;
+    if (fill) node.style.fill = fill;
+    return node;
+  };
 
   // 网格线与左轴刻度
   for (const label of model.yLabels) {
-    svg.append(el('line', {
-      x1: plot.left, y1: label.y, x2: plot.right, y2: label.y, stroke: border, 'stroke-width': 1,
-    }));
+    const line = el('line', { x1: plot.left, y1: label.y, x2: plot.right, y2: label.y, 'stroke-width': 1 });
+    paint(line, { stroke: grid });
+    svg.append(line);
     const text = el('text', {
-      x: plot.left - 8, y: label.y + 4, 'text-anchor': 'end', fill: fgMuted, 'font-size': 11,
+      x: plot.left - 8, y: label.y + 4, 'text-anchor': 'end', 'font-size': 11,
     });
+    paint(text, { fill: fgMuted });
     text.textContent = label.text;
     svg.append(text);
   }
@@ -231,56 +252,66 @@ export function renderChart(svg, options = {}) {
   if (model.rightLabels.length) {
     for (const label of model.rightLabels) {
       const text = el('text', {
-        x: plot.right + 8, y: label.y + 4, 'text-anchor': 'start', fill: fgMuted, 'font-size': 11,
+        x: plot.right + 8, y: label.y + 4, 'text-anchor': 'start', 'font-size': 11,
       });
+      paint(text, { fill: fgMuted });
       text.textContent = label.text;
       svg.append(text);
     }
     const unit = el('text', {
-      x: plot.right + 8, y: 12, 'text-anchor': 'start', fill: fgMuted, 'font-size': 10,
+      x: plot.right + 8, y: 12, 'text-anchor': 'start', 'font-size': 10,
     });
+    paint(unit, { fill: fgMuted });
     unit.textContent = '美元/桶';
     svg.append(unit);
   }
 
   // 左轴单位
   const unitLeft = el('text', {
-    x: plot.left - 8, y: 12, 'text-anchor': 'end', fill: fgMuted, 'font-size': 10,
+    x: plot.left - 8, y: 12, 'text-anchor': 'end', 'font-size': 10,
   });
+  paint(unitLeft, { fill: fgMuted });
   unitLeft.textContent = '元/升';
   svg.append(unitLeft);
 
   // x 轴刻度
   for (const label of model.xLabels) {
     const text = el('text', {
-      x: label.x, y: plot.bottom + 16, 'text-anchor': 'middle', fill: fgMuted, 'font-size': 11,
+      x: label.x, y: plot.bottom + 16, 'text-anchor': 'middle', 'font-size': 11,
     });
+    paint(text, { fill: fgMuted });
     text.textContent = label.text;
     svg.append(text);
   }
 
-  // 阶梯线 + 调价点
+  // 阶梯线 + 调价点（每档线型与图例一致）
   for (const path of model.paths) {
-    const color = GRADE_COLORS[path.grade] ?? cssVar('--accent', '#2563eb');
+    const color = gradeColor(path.grade);
     if (path.d) {
-      svg.append(el('path', {
-        d: path.d, fill: 'none', stroke: color, 'stroke-width': 2,
+      const step = el('path', {
+        d: path.d, fill: 'none', 'stroke-width': 2,
         'stroke-linejoin': 'round', 'stroke-linecap': 'round',
-      }));
+        ...(GRADE_DASH[path.grade] ? { 'stroke-dasharray': GRADE_DASH[path.grade] } : {}),
+      });
+      paint(step, { stroke: color });
+      svg.append(step);
     }
     for (const marker of path.markers) {
-      svg.append(el('circle', {
-        cx: marker.x, cy: marker.y, r: 3, fill: color,
-        stroke: cssVar('--surface', '#ffffff'), 'stroke-width': 1,
-      }));
+      const dot = el('circle', {
+        cx: marker.x, cy: marker.y, r: 3.5, 'stroke-width': 1.5,
+      });
+      paint(dot, { fill: color, stroke: cssVar('--surface', '#ffffff') });
+      svg.append(dot);
     }
   }
 
   // 叠加的国际原油（右轴，低饱和）
   if (model.overlayPath) {
-    svg.append(el('path', {
-      d: model.overlayPath, fill: 'none', stroke: fgMuted, 'stroke-width': 1.5, 'stroke-opacity': 0.55,
-    }));
+    const overlay = el('path', {
+      d: model.overlayPath, fill: 'none', 'stroke-width': 1.5, 'stroke-opacity': 0.55,
+    });
+    paint(overlay, { stroke: fgMuted });
+    svg.append(overlay);
   }
 
   // 供读屏与 tooltip 使用的元信息

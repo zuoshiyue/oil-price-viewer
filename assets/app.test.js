@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { deriveView, buildLiveSnapshot } from './app.js';
+import { deriveView, applyLiveUpdate, matchRegionName } from './app.js';
 import { buildScales } from './chart.js';
 
 const DATES = ['2026-10-16', '2026-10-30', '2026-11-13'];
@@ -34,14 +34,14 @@ const SNAPSHOT = {
       p89: [null, null, null],
       lastAdjust: { date: '2026-11-13', p92: -0.52, p95: -0.55, p98: -0.55, p0: -0.54 },
     },
-    黑龙江省: {
-      regionId: 8,
-      p92: [8.3, 8.58, 8.06],
-      p95: [8.9, 9.18, 8.63],
-      p98: [10.1, 10.38, 9.87],
-      p0: [8.0, 8.28, 7.76],
+    浙江省: {
+      regionId: 12,
+      p92: [8.29, 8.57, 8.05],
+      p95: [8.84, 9.13, 8.6],
+      p98: [10.46, 10.75, 10.22],
+      p0: [8.04, 8.32, 7.8],
       p89: [null, null, null],
-      lastAdjust: { date: '2026-11-13', p92: -0.52, p95: -0.55, p98: -0.51, p0: -0.52 },
+      lastAdjust: { date: '2026-11-13', p92: -0.52, p95: -0.53, p98: -0.53, p0: -0.52 },
     },
   },
   crudeDaily: { brent: [['2026-11-10', 90.1], ['2026-11-13', 89.8]] },
@@ -130,30 +130,68 @@ const LIVE_ROWS = [
   { regionId: 12, regionName: '浙江省', date: '2026-10-30', n89: 6.6, n92: 8.57, n95: 9.13, n98: 10.75, n0: 8.32 },
 ];
 
-test('buildLiveSnapshot 日期轴升序', () => {
-  const live = buildLiveSnapshot(LIVE_ROWS);
-  assert.deepEqual(live.dates, ['2026-10-30', '2026-11-13']);
-});
-
-test('buildLiveSnapshot 各省序列与日期轴对齐', () => {
-  const live = buildLiveSnapshot(LIVE_ROWS);
-  assert.deepEqual(live.regions['北京市'].p92, [8.89, 8.37]);
-  assert.deepEqual(live.regions['北京市'].p89, [null, null]);
-});
-
-test('buildLiveSnapshot 计算全国参考均价', () => {
-  const live = buildLiveSnapshot(LIVE_ROWS);
-  assert.deepEqual(live.national.p92, [8.73, 8.21]);
-});
-
-test('buildLiveSnapshot 全国 89 号按有值省份平均', () => {
-  const live = buildLiveSnapshot(LIVE_ROWS);
-  assert.deepEqual(live.national.p89, [6.6, 6.6]);
-});
-
-test('buildLiveSnapshot 产出的快照能直接被 deriveView 消费', () => {
-  const live = buildLiveSnapshot(LIVE_ROWS);
-  const view = deriveView(live, BASE_STATE, new Date('2026-11-26T12:00:00+08:00'));
+test('applyLiveUpdate: 实时替换后涨跌徽标仍然显示（delta 不能丢）', () => {
+  const merged = applyLiveUpdate(SNAPSHOT, LIVE_ROWS, '2026-11-26T20:00:00+08:00');
+  const view = deriveView(merged, BASE_STATE, new Date('2026-11-26T21:00:00+08:00'));
   assert.equal(view.cards.p92.price, 8.21);
-  assert.equal(view.regionName, '全国参考均价');
+  assert.equal(view.cards.p92.delta, -0.52);
+  assert.equal(view.cards.p92.date, '2026-11-13');
+});
+
+test('applyLiveUpdate: 各省与全国均价都被重建', () => {
+  const merged = applyLiveUpdate(SNAPSHOT, LIVE_ROWS, '2026-11-26T20:00:00+08:00');
+  assert.equal(merged.regions['北京市'].p92.at(-1), 8.37);
+  assert.equal(merged.national.p92.at(-1), 8.21);
+  assert.ok(merged.national.lastAdjust, '全国 lastAdjust 也要有');
+});
+
+test('applyLiveUpdate: 原油日线序列被保留（周视图的唯一波动信号）', () => {
+  const merged = applyLiveUpdate(SNAPSHOT, LIVE_ROWS, '2026-11-26T20:00:00+08:00');
+  assert.deepEqual(merged.crudeDaily.brent, [['2026-11-10', 90.1], ['2026-11-13', 89.8]]);
+});
+
+test('applyLiveUpdate: 旧快照独有的历史窗口不丢（累积历史）', () => {
+  const withHistory = JSON.parse(JSON.stringify(SNAPSHOT));
+  withHistory.dates = ['2025-06-01', ...withHistory.dates];
+  for (const region of [withHistory.national, ...Object.values(withHistory.regions)]) {
+    for (const grade of ['p92', 'p95', 'p98', 'p0', 'p89']) {
+      region[grade] = [region[grade][0], ...region[grade]];
+    }
+  }
+  const merged = applyLiveUpdate(withHistory, LIVE_ROWS, '2026-11-26T20:00:00+08:00');
+  assert.ok(merged.dates.includes('2025-06-01'), '旧历史窗口应保留');
+  assert.equal(merged.dates.length, withHistory.dates.length);
+});
+
+test('deriveView: lastAdjust 缺失时回退到逐档计算', () => {
+  const noAdjust = JSON.parse(JSON.stringify(SNAPSHOT));
+  noAdjust.national.lastAdjust = null;
+  noAdjust.regions['北京市'].lastAdjust = null;
+  const view = deriveView(noAdjust, BASE_STATE, new Date('2026-11-26T12:00:00+08:00'));
+  assert.equal(view.cards.p92.delta, -0.52);
+  assert.equal(view.cards.p95.delta, -0.52);
+});
+
+test('matchRegionName: ipinfo 英文省名映射到快照里的中文名', () => {
+  const names = Object.keys(SNAPSHOT.regions);
+  assert.equal(matchRegionName('Beijing', names), '北京市');
+  assert.equal(matchRegionName('Zhejiang', names), '浙江省');
+  assert.equal(matchRegionName('Inner Mongolia', names), null, '快照里没有内蒙古时应返回 null');
+});
+
+test('matchRegionName: 易混省名不串（山西/陕西、广西/广东）', () => {
+  const names = ['山西省', '陕西省', '广东省', '广西'];
+  assert.equal(matchRegionName('Shanxi', names), '山西省');
+  assert.equal(matchRegionName('Shaanxi', names), '陕西省');
+  assert.equal(matchRegionName('Guangxi', names), '广西');
+  assert.equal(matchRegionName('Guangdong', names), '广东省');
+});
+
+test('matchRegionName: 无匹配时返回 null', () => {
+  assert.equal(matchRegionName('California', ['北京市', '浙江省']), null);
+  assert.equal(matchRegionName('', ['北京市']), null);
+});
+
+test('matchRegionName: 中文输入直接匹配', () => {
+  assert.equal(matchRegionName('北京市', ['北京市', '浙江省']), '北京市');
 });

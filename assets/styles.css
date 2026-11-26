@@ -1,4 +1,10 @@
-/* 油价看板样式：移动优先，零依赖，跟随系统深浅色并支持手动切换。 */
+/* ============================================================
+   油价看板 · Material 3 风格设计系统
+   - tonal surface 层级（背景 < 卡片 < 内嵌填充），无纯白页面底色
+   - 涨红跌绿走 container 色对（对比度经 tools/check-contrast.mjs 校验）
+   - 交互用 state layer（背景色过渡），不做位移抖动
+   - emphasized 缓动 cubic-bezier(0.2,0,0,1)，尊重 prefers-reduced-motion
+   ============================================================ */
 
 :root {
   color-scheme: light dark;
@@ -11,20 +17,52 @@
     color-scheme: light;
   }
 
-  --bg: light-dark(#f6f7f9, #0d1117);
-  --surface: light-dark(#ffffff, #161b22);
-  --surface-2: light-dark(#f0f2f5, #1c2128);
-  --fg: light-dark(#1c2024, #e6edf3);
-  --fg-muted: light-dark(#5b636c, #9aa4ae);
-  --border: light-dark(#e2e5ea, #2a3038);
-  --accent: light-dark(#2563eb, #6ea8fe);
-  --accent-soft: light-dark(#e8f0fe, #17243b);
-  --up: light-dark(#c62f24, #ff8a80);
-  --down: light-dark(#0f7a4d, #56d49b);
-  --flat: light-dark(#5b636c, #9aa4ae);
-  --shadow: light-dark(0 1px 2px rgb(16 24 40 / 6%), 0 1px 2px rgb(0 0 0 / 40%));
-  --radius: 14px;
-  --radius-sm: 10px;
+  /* --- tonal surfaces --- */
+  --bg: light-dark(#f3f5f9, #111318);
+  --surface: light-dark(#ffffff, #1a1c21);
+  --surface-2: light-dark(#e9eef6, #23262c);
+  --surface-3: light-dark(#dce4ef, #2c3038);
+
+  /* --- 文本 --- */
+  --fg: light-dark(#1a1c1e, #e3e2e6);
+  --fg-muted: light-dark(#43474e, #c4c6cc);
+
+  /* --- 形状与描边 --- */
+  --outline: light-dark(#74777f, #8e9099);
+  --outline-soft: light-dark(#c4c7ce, #3c4048);
+
+  /* --- 主色（M3 blue tonal） --- */
+  --primary: light-dark(#1f5aa8, #a8c7f0);
+  --on-primary: light-dark(#ffffff, #0a2f66);
+  --primary-container: light-dark(#d6e3ff, #274a78);
+  --on-primary-container: light-dark(#0a2f66, #d6e3ff);
+
+  /* --- 涨红 / 跌绿（container 色对 + 线条色） --- */
+  --up: light-dark(#b3231d, #ffb4ab);
+  --up-container: light-dark(#fbeae9, #5c1f1b);
+  --on-up-container: light-dark(#8c1d18, #ffd9d5);
+  --down: light-dark(#0e6e44, #74dcae);
+  --down-container: light-dark(#e2f4ea, #14452f);
+  --on-down-container: light-dark(#0b5636, #c4f1dd);
+  --flat: light-dark(#43474e, #c4c6cc);
+  --flat-container: light-dark(#e9eef6, #2c3038);
+  --on-flat-container: light-dark(#43474e, #c4c6cc);
+
+  /* --- 图表序列色（与图例/卡片标题同源） --- */
+  --grade-p92: light-dark(#1f5aa8, #a8c7f0);
+  --grade-p95: light-dark(#8c4a00, #e5b678);
+  --grade-p98: light-dark(#6e56cf, #c4b5f0);
+  --grade-p0: light-dark(#00696e, #7bd4d9);
+  --grade-p89: light-dark(#a03b5e, #e8a2be);
+
+  /* --- 形状 / 动效 --- */
+  --radius-lg: 20px;
+  --radius: 16px;
+  --radius-sm: 12px;
+  --radius-pill: 999px;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --duration: 200ms;
+  --shadow-1: light-dark(0 1px 2px rgb(16 24 40 / 8%), none);
   --gap: 0.75rem;
 }
 
@@ -63,13 +101,18 @@ h3 {
 }
 
 a {
-  color: var(--accent);
+  color: var(--primary);
 }
 
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--primary);
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: 6px;
+}
+
+::selection {
+  background: var(--primary-container);
+  color: var(--on-primary-container);
 }
 
 .visually-hidden {
@@ -89,18 +132,20 @@ a {
   inset-inline-start: 0.5rem;
   inset-block-start: -3rem;
   z-index: 10;
-  padding: 0.5rem 0.75rem;
+  padding: 0.5rem 0.9rem;
   background: var(--surface);
-  border: 1px solid var(--border);
+  color: var(--fg);
+  border: 1px solid var(--outline);
   border-radius: var(--radius-sm);
-  transition: inset-block-start 0.15s ease;
+  box-shadow: var(--shadow-1);
+  transition: inset-block-start var(--duration) var(--ease);
 }
 
 .skip-link:focus {
   inset-block-start: 0.5rem;
 }
 
-/* ---------- 顶栏 ---------- */
+/* ---------- 顶栏（app bar 风格） ---------- */
 
 .topbar {
   display: flex;
@@ -108,20 +153,22 @@ a {
   align-items: center;
   justify-content: space-between;
   gap: var(--gap);
-  max-inline-size: 1080px;
+  max-inline-size: 1120px;
   margin-inline: auto;
-  padding: 1rem 1rem 0.5rem;
+  padding: 1.25rem 1rem 0.75rem;
 }
 
 .topbar__title h1 {
-  font-size: 1.35rem;
+  font-size: 1.45rem;
+  font-weight: 700;
   letter-spacing: 0.01em;
 }
 
 .topbar__subtitle {
-  margin: 0.15rem 0 0;
-  font-size: 0.8rem;
+  margin: 0.2rem 0 0;
+  font-size: 0.78rem;
   color: var(--fg-muted);
+  letter-spacing: 0.04em;
 }
 
 .topbar__tools {
@@ -135,7 +182,8 @@ a {
   margin: 0;
   font-size: 0.78rem;
   color: var(--fg-muted);
-  max-inline-size: 22rem;
+  max-inline-size: 24rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .meta[data-state='stale'] {
@@ -151,18 +199,25 @@ a {
 .btn {
   min-block-size: 44px;
   min-inline-size: 44px;
-  padding: 0.5rem 0.9rem;
+  padding: 0.5rem 1rem;
   font: inherit;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
+  font-weight: 500;
   color: var(--fg);
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border: 1px solid var(--outline);
+  border-radius: var(--radius-pill);
   cursor: pointer;
+  transition: background-color var(--duration) var(--ease), border-color var(--duration) var(--ease);
 }
 
 .btn:hover {
-  background: var(--surface-2);
+  background: var(--surface-3);
+}
+
+.btn:active {
+  background: var(--surface-3);
+  border-color: var(--fg-muted);
 }
 
 .btn--icon {
@@ -170,7 +225,11 @@ a {
   place-items: center;
   inline-size: 44px;
   padding: 0;
-  font-size: 1.05rem;
+}
+
+.btn--icon svg {
+  inline-size: 22px;
+  block-size: 22px;
 }
 
 .btn--ghost {
@@ -182,21 +241,21 @@ a {
 }
 
 .theme-toggle__dark {
-  display: inline;
+  display: inline-flex;
 }
 
 :has(> head > meta[name='color-scheme'][content='dark']) .theme-toggle__light {
-  display: inline;
+  display: inline-flex;
 }
 
 :has(> head > meta[name='color-scheme'][content='dark']) .theme-toggle__dark {
   display: none;
 }
 
-/* ---------- 面板 ---------- */
+/* ---------- 布局 ---------- */
 
 main {
-  max-inline-size: 1080px;
+  max-inline-size: 1120px;
   margin-inline: auto;
   padding: 0 1rem 2rem;
   display: grid;
@@ -205,25 +264,25 @@ main {
 
 .panel {
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  padding: 1rem;
+  border: 1px solid light-dark(rgb(26 28 30 / 8%), rgb(255 255 255 / 8%));
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-1);
+  padding: 1.1rem;
 }
 
 .panel__title {
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   color: var(--fg-muted);
-  margin-block-end: 0.75rem;
+  margin-block-end: 0.8rem;
 }
 
 /* ---------- 筛选 ---------- */
 
 .filters {
   display: grid;
-  gap: 0.9rem;
+  gap: 1rem;
 }
 
 .filters__row {
@@ -241,20 +300,28 @@ main {
 }
 
 .field__label {
-  font-size: 0.78rem;
+  font-size: 0.75rem;
+  font-weight: 500;
   color: var(--fg-muted);
+  letter-spacing: 0.03em;
 }
 
 select {
-  min-block-size: 44px;
-  padding: 0.45rem 0.6rem;
+  min-block-size: 48px;
+  padding: 0.5rem 0.7rem;
   font: inherit;
   font-size: 0.95rem;
   color: var(--fg);
   background: var(--surface-2);
-  border: 1px solid var(--border);
+  border: 1px solid var(--outline-soft);
   border-radius: var(--radius-sm);
   inline-size: 100%;
+  cursor: pointer;
+  transition: background-color var(--duration) var(--ease), border-color var(--duration) var(--ease);
+}
+
+select:hover {
+  border-color: var(--outline);
 }
 
 fieldset {
@@ -269,32 +336,38 @@ fieldset {
 
 fieldset legend {
   padding: 0;
-  margin-block-end: 0.35rem;
+  margin-block-end: 0.4rem;
 }
 
-/* 标号 chips：用原生 checkbox + label，选中态只改颜色不改变布局 */
+/* 标号 chips：M3 filter chip —— pill + 描边，选中态换容器色（不改布局） */
 .chip {
   position: relative;
   display: inline-flex;
   align-items: center;
   min-block-size: 44px;
-  padding: 0 0.85rem;
-  font-size: 0.9rem;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--surface-2);
+  padding: 0 1rem;
+  font-size: 0.88rem;
+  font-weight: 500;
+  border: 1px solid var(--outline);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
   cursor: pointer;
   user-select: none;
+  transition: background-color var(--duration) var(--ease), border-color var(--duration) var(--ease);
+}
+
+.chip:hover {
+  background: var(--surface-2);
 }
 
 .chip:has(:checked) {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  color: var(--fg);
+  border-color: var(--primary);
+  background: var(--primary-container);
+  color: var(--on-primary-container);
 }
 
 .chip:has(:focus-visible) {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
 
@@ -305,14 +378,14 @@ fieldset legend {
   block-size: 1px;
 }
 
-/* 区间分段控件 */
+/* 区间分段：M3 button group —— 选中段填充主色 */
 .segmented {
   gap: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border: 1px solid var(--outline);
+  border-radius: var(--radius-pill);
   overflow: hidden;
   inline-size: fit-content;
-  background: var(--surface-2);
+  background: var(--surface);
 }
 
 .segmented legend {
@@ -329,25 +402,39 @@ fieldset legend {
   align-items: center;
   justify-content: center;
   min-block-size: 44px;
-  padding: 0 0.95rem;
-  font-size: 0.9rem;
+  padding: 0 1.1rem;
+  font-size: 0.88rem;
+  font-weight: 500;
   cursor: pointer;
-  border-inline-end: 1px solid var(--border);
+  color: var(--fg-muted);
+  border-inline-end: 1px solid var(--outline-soft);
+  transition: background-color var(--duration) var(--ease), color var(--duration) var(--ease);
+}
+
+.segmented__item:first-of-type {
+  border-start-start-radius: var(--radius-pill);
+  border-end-start-radius: var(--radius-pill);
 }
 
 .segmented__item:last-of-type {
   border-inline-end: 0;
+  border-start-end-radius: var(--radius-pill);
+  border-end-end-radius: var(--radius-pill);
+}
+
+.segmented__item:hover {
+  background: var(--surface-2);
 }
 
 .segmented__item:has(:checked) {
-  background: var(--accent);
-  color: light-dark(#ffffff, #0d1117);
+  background: var(--primary);
+  color: var(--on-primary);
   font-weight: 600;
 }
 
 .segmented__item:has(:focus-visible) {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
+  outline: 2px solid var(--primary);
+  outline-offset: -3px;
 }
 
 .segmented__item input {
@@ -360,9 +447,9 @@ fieldset legend {
 .switch {
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.5rem;
   min-block-size: 44px;
-  font-size: 0.88rem;
+  font-size: 0.85rem;
   color: var(--fg-muted);
   cursor: pointer;
 }
@@ -370,53 +457,69 @@ fieldset legend {
 .switch input {
   inline-size: 18px;
   block-size: 18px;
-  accent-color: var(--accent);
+  accent-color: var(--primary);
 }
 
-/* ---------- 价格卡片 ---------- */
+/* ---------- 价格卡片（KPI card） ---------- */
 
 .card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.5rem), 1fr));
-  gap: 0.6rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  gap: 0.75rem;
 }
 
 .card-grid--two {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
 }
 
 .card {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-  padding: 0.85rem 0.9rem;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
+  gap: 0.3rem;
+  padding: 0.95rem 1rem 0.85rem;
+  background: var(--surface);
+  border: 1px solid light-dark(rgb(26 28 30 / 6%), rgb(255 255 255 / 6%));
   border-radius: var(--radius);
+  box-shadow: var(--shadow-1);
+  border-block-start: 3px solid var(--grade-p92);
+}
+
+.card[data-grade='p95'] {
+  border-block-start-color: var(--grade-p95);
+}
+
+.card[data-grade='p98'] {
+  border-block-start-color: var(--grade-p98);
+}
+
+.card[data-grade='p0'] {
+  border-block-start-color: var(--grade-p0);
+}
+
+.card[data-grade='p89'] {
+  border-block-start-color: var(--grade-p89);
 }
 
 .card__title {
-  font-size: 0.78rem;
-  font-weight: 500;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
   color: var(--fg-muted);
-}
-
-.card__content {
-  margin: 0;
-  font-size: 0.9rem;
 }
 
 .price {
   display: flex;
   align-items: baseline;
-  gap: 0.25rem;
+  gap: 0.3rem;
+  margin: 0.1rem 0 0.15rem;
 }
 
 .price__value {
-  font-size: clamp(1.6rem, 6vw, 2.1rem);
-  font-weight: 650;
+  font-size: clamp(1.75rem, 7vw, 2.3rem);
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
+  line-height: 1.1;
 }
 
 .price__unit {
@@ -428,28 +531,37 @@ fieldset legend {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0.2rem 0.4rem;
-  font-size: 0.8rem;
+  gap: 0.3rem 0.45rem;
+  font-size: 0.78rem;
   color: var(--fg-muted);
   font-variant-numeric: tabular-nums;
 }
 
+/* 涨跌徽标：container 色对的 pill（不只靠颜色——带 ↑/↓ 符号） */
 .delta {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.12rem 0.55rem;
+  border-radius: var(--radius-pill);
+  font-size: 0.75rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
 .delta--up {
-  color: var(--up);
+  color: var(--on-up-container);
+  background: var(--up-container);
 }
 
 .delta--down {
-  color: var(--down);
+  color: var(--on-down-container);
+  background: var(--down-container);
 }
 
 .delta--flat {
-  color: var(--flat);
+  color: var(--on-flat-container);
+  background: var(--flat-container);
 }
 
 .placeholder {
@@ -462,11 +574,11 @@ fieldset legend {
 
 .chart-figure {
   margin: 0;
-  padding: 1rem;
+  padding: 1.1rem;
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
+  border: 1px solid light-dark(rgb(26 28 30 / 8%), rgb(255 255 255 / 8%));
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-1);
 }
 
 .chart-figure__caption {
@@ -475,13 +587,13 @@ fieldset legend {
   align-items: baseline;
   justify-content: space-between;
   gap: 0.4rem;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   font-weight: 600;
-  margin-block-end: 0.5rem;
+  margin-block-end: 0.6rem;
 }
 
 .chart-figure__hint {
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   font-weight: 400;
   color: var(--fg-muted);
 }
@@ -490,12 +602,25 @@ fieldset legend {
   position: relative;
 }
 
+#chart {
+  display: block;
+  inline-size: 100%;
+  block-size: 280px;
+  touch-action: pan-y;
+}
+
+@media (min-width: 720px) {
+  #chart {
+    block-size: 360px;
+  }
+}
+
 .chart-cursor {
   position: absolute;
   inset-block: 0;
   inline-size: 1px;
   background: var(--fg-muted);
-  opacity: 0.4;
+  opacity: 0.45;
   pointer-events: none;
 }
 
@@ -503,17 +628,18 @@ fieldset legend {
   position: absolute;
   inset-block-start: 8px;
   inset-inline-end: 0;
-  max-inline-size: 70%;
-  padding: 0.4rem 0.6rem;
-  font-size: 0.75rem;
-  line-height: 1.4;
+  max-inline-size: 72%;
+  padding: 0.45rem 0.7rem;
+  font-size: 0.78rem;
+  line-height: 1.45;
   color: var(--fg);
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--outline-soft);
   border-radius: var(--radius-sm);
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-1);
   pointer-events: none;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .chart-tooltip[hidden],
@@ -521,28 +647,14 @@ fieldset legend {
   display: none;
 }
 
-#chart {
-  display: block;
-  inline-size: 100%;
-  block-size: 260px;
-  touch-action: pan-y;
-}
-
-@media (min-width: 720px) {
-  #chart {
-    block-size: 340px;
-  }
-}
-
 /* 图表下方的说明条：空态或"本区间无调价"等提示，不遮挡图表 */
 .chart-empty {
-  margin-block-start: 0.6rem;
-  padding: 0.55rem 0.75rem;
+  margin-block-start: 0.7rem;
+  padding: 0.6rem 0.8rem;
   text-align: center;
   font-size: 0.8rem;
   color: var(--fg-muted);
   background: var(--surface-2);
-  border: 1px dashed var(--border);
   border-radius: var(--radius-sm);
 }
 
@@ -550,59 +662,75 @@ fieldset legend {
   display: none;
 }
 
+/* 图例：色样 + 线型与图表一致（不只靠颜色区分序列） */
 .legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem;
-  margin-block-start: 0.5rem;
-  font-size: 0.8rem;
+  gap: 0.4rem 0.9rem;
+  margin-block-start: 0.7rem;
+  font-size: 0.78rem;
   color: var(--fg-muted);
 }
 
 .legend__item {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.4rem;
 }
 
 .legend__swatch {
-  inline-size: 14px;
-  block-size: 3px;
-  border-radius: 2px;
-  background: currentcolor;
+  inline-size: 18px;
+  block-size: 0;
+  border-block-end: 3px solid currentcolor;
 }
 
 .legend__item[data-grade='p92'] {
-  color: var(--accent);
+  color: var(--grade-p92);
 }
 
 .legend__item[data-grade='p95'] {
-  color: #b45309;
+  color: var(--grade-p95);
+}
+
+.legend__item[data-grade='p95'] .legend__swatch {
+  border-block-end-style: dashed;
 }
 
 .legend__item[data-grade='p98'] {
-  color: #7c3aed;
+  color: var(--grade-p98);
+}
+
+.legend__item[data-grade='p98'] .legend__swatch {
+  border-block-end-style: dotted;
 }
 
 .legend__item[data-grade='p0'] {
-  color: #0e7490;
+  color: var(--grade-p0);
+}
+
+.legend__item[data-grade='p0'] .legend__swatch {
+  border-block-end-style: double;
 }
 
 .legend__item[data-grade='p89'] {
-  color: #9d174d;
+  color: var(--grade-p89);
 }
 
 .legend__item[data-series='brent'] {
   color: var(--fg-muted);
 }
 
+.legend__item[data-series='brent'] .legend__swatch {
+  opacity: 0.55;
+}
+
 /* ---------- 页脚 ---------- */
 
 .footer {
-  max-inline-size: 1080px;
+  max-inline-size: 1120px;
   margin-inline: auto;
-  padding: 0 1rem 2.5rem;
-  font-size: 0.8rem;
+  padding: 0 1rem 2.75rem;
+  font-size: 0.78rem;
   color: var(--fg-muted);
   display: grid;
   gap: 0.4rem;
@@ -613,7 +741,7 @@ fieldset legend {
 }
 
 .footer__muted {
-  opacity: 0.8;
+  opacity: 0.75;
 }
 
 /* ---------- 高对比度与动效 ---------- */
