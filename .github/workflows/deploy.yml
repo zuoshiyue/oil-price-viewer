@@ -37,6 +37,8 @@ jobs:
             echo "no data change, skip commit"
           else
             git commit -m "chore(data): update oil prices $(TZ=Asia/Shanghai date '+%F %H:%M')"
+            # 并发运行时远端可能已推进，rebase 后再推，避免 non-fast-forward
+            git pull --rebase origin main
             git push
           fi
 
